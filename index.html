@@ -475,7 +475,7 @@ button.destructive {
             <button id="clear" class="destructive">消去</button>
         </div>
 
-        <div id="status" class="status">描画モードです。手書きしたあとに範囲指定・切り出しへ切り替えてください。</div>
+        <div id="status" class="status">何か書いてみよう</div>
     </section>
 
     <section id="previewPanel" >
@@ -1153,7 +1153,7 @@ function setTool(nextTool) {
         layers.splice(selectedLayerIndex, 1);
         selectedLayerIndex = -1;
     }
-    
+
     if (nextTool === "pen") {
         ctx.globalCompositeOperation = "source-over";
         ctx.lineWidth = 6;
