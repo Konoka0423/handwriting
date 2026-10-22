@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>メッセージと文字を交換するサイト</title>
+
+
+<style>
+
+:root {
+    color-scheme: light;
+    --bg: #f4f1ea;
+    --panel: #ffffff;
+    --ink: #1d1d1f;
+    --muted: #6b7280;
+    --line: #d6d3cc;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --danger: #b91c1c;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+}
+
+main {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+}
+
+header {
+    margin-bottom: 18px;
+}
+
+header h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    letter-spacing: 0.04em;
+}
+
+header p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+}
+
+.stage,
+
+
+.stage {
+    padding: 18px;
+}
+
+.canvas-shell {
+    position: relative;
+    width: min(100%, 960px);
+    margin: 0 auto;
+    aspect-ratio: 5 / 3;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    background: white;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+}
+
+#selectionCanvas {
+    pointer-events: none;
+}
+
+.board {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.board-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 16px auto 10px;
+}
+
+button {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 11px 18px;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--ink);
+    background: var(--panel);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+button:active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+button.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+button.destructive {
+    color: var(--danger);
+}
+
+.status {
+    width: min(100%, 960px);
+    margin: 12px auto 0;
+    color: var(--muted);
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.gallery {
+    margin-top: 18px;
+    padding: 18px;
+}
+
+.preview-panel {
+    display: none;
+}
+
+.preview-panel h2 {
+    margin: 0 0 14px;
+    font-size: 1.2rem;
+}
+
+.preview-shell {
+    position: relative;
+    width: min(100%, 960px);
+    margin: 0 auto;
+    aspect-ratio: 5 / 3;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.preview-shell canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+}
+
+.preview-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.gallery h2 {
+    margin: 0 0 14px;
+    font-size: 1.2rem;
+}
+
+.crop-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+}
+
+.crop-item {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 12px;
+}
+
+.crop-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+}
+
+.crop-index {
+    font-weight: 700;
+}
+
+.crop-info {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.preview {
+    display: grid;
+    place-items: center;
+    min-height: 120px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background:
+        linear-gradient(45deg, #f3f4f6 25%, transparent 25%) 0 0 / 14px 14px,
+        linear-gradient(-45deg, #f3f4f6 25%, transparent 25%) 0 7px / 14px 14px,
+        linear-gradient(45deg, transparent 75%, #f3f4f6 75%) 7px 0 / 14px 14px,
+        linear-gradient(-45deg, transparent 75%, #f3f4f6 75%) 7px 7px / 14px 14px,
+        #fff;
+    overflow: hidden;
+}
+
+.preview img {
+    display: block;
+    max-width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+}
+
+.crop-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.crop-actions button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.snapshot-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.snapshot-item {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 12px;
+}
+
+.snapshot-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+}
+
+.snapshot-title {
+    font-weight: 700;
+}
+
+.snapshot-info {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.snapshot-preview {
+    display: grid;
+    place-items: center;
+    min-height: 160px;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background:
+        linear-gradient(45deg, #f3f4f6 25%, transparent 25%) 0 0 / 14px 14px,
+        linear-gradient(-45deg, #f3f4f6 25%, transparent 25%) 0 7px / 14px 14px,
+        linear-gradient(45deg, transparent 75%, #f3f4f6 75%) 7px 0 / 14px 14px,
+        linear-gradient(-45deg, transparent 75%, #f3f4f6 75%) 7px 7px / 14px 14px,
+        #fff;
+    overflow: hidden;
+}
+
+.snapshot-preview img {
+    display: block;
+    max-width: 100%;
+    max-height: 240px;
+    object-fit: contain;
+}
+
+.empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 28px 0;
+}
+
+.board-item {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    user-select: none;
+    touch-action: none;
+    cursor: grab;
+    pointer-events: auto;
+}
+
+.board-item.dragging {
+    cursor: grabbing;
+    z-index: 10;
+}
+
+.board-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.14));
+}
+
+.board-frame {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+}
+
+.item-actions {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    display: flex;
+    gap: 6px;
+    z-index: 2;
+}
+
+.item-actions button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid rgba(214, 211, 204, 0.95);
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.resize-handle,
+.rotate-handle {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 2px solid white;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+    background: var(--accent);
+    z-index: 3;
+    touch-action: none;
+}
+
+.resize-handle {
+    right: -9px;
+    bottom: -9px;
+    cursor: nwse-resize;
+}
+
+.rotate-handle {
+    left: 50%;
+    top: -28px;
+    transform: translateX(-50%);
+    cursor: grab;
+    background: #14b8a6;
+}
+
+.handle-label {
+    position: absolute;
+    left: 50%;
+    top: -46px;
+    transform: translateX(-50%);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.75);
+    color: white;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+@media (max-width: 720px) {
+    main {
+        padding: 16px 12px 28px;
+    }
+
+    .stage,
+    .gallery {
+        border-radius: 16px;
+        padding: 14px;
+    }
+
+    .crop-list {
+        grid-template-columns: 1fr;
+    }
+
+    .snapshot-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .stage {
+        position: relative;
+    }
+
+    .controls {
+        position: sticky;
+        top: 8px;
+        z-index: 5;
+        margin: 12px auto 10px;
+        padding: 10px 8px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+    }
+}
+.keyboard-tools {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin:18px 0 10px;
+    position:relative;
+    z-index:6;
+}
+#keyboardPanel {
+    display:none;
+    position:relative;
+    z-index:6;
+    margin:14px 0 24px;
+    padding:16px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:#fff;
+}
+#keyboardPanel.visible { display:block; }
+.keyboard-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:6px; }
+.keyboard-key { min-height:62px; padding:5px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:1px solid #d1d5db; border-radius:8px; background:#f8fafc; color:#111827; }
+.keyboard-key .key-label { font-size:18px; }
+.keyboard-key img { width:34px; height:34px; object-fit:contain; }
+.keyboard-key.registered { background:#fff; border-color:#6b7280; }
+.keyboard-key:disabled { opacity:.5; background:#f3f4f6; cursor:not-allowed; }
+.keyboard-key:disabled .key-label { color:#777; }
+#registerDialog { display:none; position:fixed; inset:0; z-index:1000; background:#0008; align-items:center; justify-content:center; padding:16px; }
+#registerDialog.visible { display:flex; }
+.register-box { width:min(420px,100%); background:#fff; border-radius:14px; padding:22px; box-shadow:0 10px 40px #0003; }
+.register-box select { width:100%; padding:12px; margin:12px 0; font-size:18px; }
+.register-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+@media(max-width:600px) { .keyboard-grid { grid-template-columns:repeat(5,minmax(0,1fr)); } .keyboard-key { min-height:56px; } }
+
+/* ナビゲーションバー */
+.site-nav {
+  width: min(1100px, calc(100% - 28px));
+  margin: 16px auto 24px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  border: 1px solid #dedede;
+  border-radius: 16px;
+  background: #f7f7f7;
+  box-sizing: border-box;
+}
+
+.site-nav a {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 10px;
+  border-radius: 11px;
+  text-decoration: none;
+  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.site-nav a:hover {
+  background: #e9e9e9;
+}
+
+/* 現在開いているページ */
+.site-nav a.active {
+  background: #252525;
+  color: #fff;
+}
+
+.site-nav .nav-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* スマートフォン対応 */
+@media (max-width: 520px) {
+  .site-nav {
+    width: calc(100% - 20px);
+    margin: 10px auto 18px;
+    padding: 5px;
+    gap: 5px;
+  }
+
+  .site-nav a {
+    padding: 11px 5px;
+    gap: 5px;
+    font-size: 13px;
+  }
+
+  .site-nav .nav-icon {
+    display: none;
+  }
+}
+</style>
+
+</head>
+
+
+<body>
+
+
+<main>
+    <header>
+        <h1>メッセージと文字を交換するサイト</h1>
+
+    </header>
+
+    <!-- ナビゲーションバー -->
+        <nav class="site-nav" aria-label="メインナビゲーション">
+        <a href="write.html" class="active">
+            <span class="nav-icon">✎</span>
+            <span>メッセージを書く</span>
+        </a>
+
+        <a href="keybord.html">
+            <span class="nav-icon">▤</span>
+            <span>みんなのメッセージ</span>
+        </a>
+        </nav>
+
+    <section class="stage">
+        <div class="canvas-shell" aria-label="手書き入力キャンバス">
+            <canvas id="canvas" width="900" height="540"></canvas>
+            <canvas id="selectionCanvas" width="900" height="540"></canvas>
+        </div>
+
+        <div class="controls">
+            <button id="pen" class="active">ペン</button>
+            <button id="eraser">消しゴム</button>
+            <button id="select">範囲指定・切り出し</button>
+            <button id="commit">確定</button>
+            <button id="apply">カードを保存</button>
+            <button id="clear" class="destructive">消去</button>
+        </div>
+
+        <div class="keyboard-tools">
+            <button type="button" id="registerKeyboard">キーボードに登録</button>
+            <button type="button" id="toggleKeyboard">キーボードを表示</button>
+        </div>
+        <section id="keyboardPanel" aria-label="手書き文字キーボード">
+            <h2>手書き文字キーボード</h2>
+            <p>登録済みの文字を押すと、編集中のカードに追加されます。薄い文字は未登録です。</p>
+            <div id="keyboardGrid" class="keyboard-grid"></div>
+        </section>
+        <div id="registerDialog" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
+            <div class="register-box">
+                <h2 id="registerTitle">登録する文字を選択</h2>
+                <p>切り出した文字を、どのひらがなとして登録するか選んでください。</p>
+                <select id="registerKana" aria-label="登録するひらがな"></select>
+                <div class="register-actions">
+                    <button type="button" id="cancelRegister">キャンセル</button>
+                    <button type="button" id="confirmRegister">登録する</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="status">何か書いてみよう</div>
+    </section>
+
+    <section id="previewPanel" >
+        <h2>選択したカード</h2>
+        <div class="preview-shell">
+            <canvas id="previewCanvas" width="900" height="540"></canvas>
+            <canvas id="previewSelectionCanvas" width="900" height="540"></canvas>
+        </div>
+        <div class="preview-controls">
+            <button id="previewSelect">範囲選択</button>
+            <button id="previewApply">描画キャンバスへ反映</button>
+            <button id="previewClear" class="destructive">プレビューを閉じる</button>
+        </div>
+    </section>
+
+</main>
+
+
+<script>
+
+var canvas = document.getElementById("canvas");
+var selectionCanvas = document.getElementById("selectionCanvas");
+var ctx = canvas.getContext("2d");
+var selectionCtx = selectionCanvas.getContext("2d");
+var status = document.getElementById("status");
+var penButton = document.getElementById("pen");
+var eraserButton = document.getElementById("eraser");
+var selectButton = document.getElementById("select");
+var commitButton = document.getElementById("commit");
+var applyButton = document.getElementById("apply");
+var clearButton = document.getElementById("clear");
+var snapshotList = document.getElementById("snapshotList");
+var snapshotEmpty = document.getElementById("snapshotEmpty");
+var previewCanvas = document.getElementById("previewCanvas");
+var previewSelectionCanvas = document.getElementById("previewSelectionCanvas");
+var previewCtx = previewCanvas.getContext("2d");
+var previewSelectionCtx = previewSelectionCanvas.getContext("2d");
+var previewSelectButton = document.getElementById("previewSelect");
+var previewApplyButton = document.getElementById("previewApply");
+var previewClearButton = document.getElementById("previewClear");
+
+var mode = "draw";
+var drawing = false;
+var selecting = false;
+var currentSelection = null;
+var selectionStart = null;
+var layers = [];
+var selectedLayerIndex = -1;
+var activeTransform = null;
+var snapshots = [];
+var SAVED_CARD_STORAGE_KEY = "sharedSavedCards_v1";
+var previewImage = null;
+var previewLayers = [];
+var previewSelectedLayerIndex = -1;
+var previewSelecting = false;
+var previewSelection = null;
+var previewSelectionStart = null;
+var activePreviewTransform = null;
+var previewMode = "idle";
+
+ctx.lineCap = "round";
+ctx.lineJoin = "round";
+ctx.strokeStyle = "#000000";
+ctx.lineWidth = 6;
+
+function setStatus(message) {
+    status.textContent = message;
+}
+
+function setActiveButton(activeButton) {
+    [penButton, eraserButton, selectButton].forEach(function (button) {
+        button.classList.toggle("active", button === activeButton);
+    });
+}
+
+function getCanvasPoint(event, targetCanvas) {
+    var rect = targetCanvas.getBoundingClientRect();
+    var scaleX = targetCanvas.width / rect.width;
+    var scaleY = targetCanvas.height / rect.height;
+
+    return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY,
+    };
+}
+
+function normalizeRect(start, end) {
+    return {
+        x: Math.min(start.x, end.x),
+        y: Math.min(start.y, end.y),
+        width: Math.abs(end.x - start.x),
+        height: Math.abs(end.y - start.y),
+    };
+}
+
+function clearOverlay() {
+    selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+}
+
+function updateSnapshotEmptyState() {
+    snapshotEmpty.style.display = snapshots.length === 0 ? "grid" : "none";
+}
+
+function loadSnapshotsFromStorage() {
+    try {
+        var raw = localStorage.getItem(SAVED_CARD_STORAGE_KEY);
+        if (!raw) {
+            snapshots = [];
+            return;
+        }
+
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            snapshots = [];
+            return;
+        }
+
+        snapshots = parsed.filter(function (item) {
+            return item && typeof item.dataUrl === "string";
+        }).map(function (item) {
+            return {
+                dataUrl: item.dataUrl,
+                width: typeof item.width === "number" ? item.width : canvas.width,
+                height: typeof item.height === "number" ? item.height : canvas.height,
+            };
+        });
+    } catch (error) {
+        snapshots = [];
+    }
+}
+
+function saveSnapshotsToStorage() {
+    try {
+        localStorage.setItem(SAVED_CARD_STORAGE_KEY, JSON.stringify(snapshots));
+    } catch (error) {
+        setStatus("保存カードの保存に失敗しました。ストレージ容量を確認してください。");
+    }
+}
+
+function renderSnapshotList() {
+    snapshotList.innerHTML = "";
+
+    if (snapshots.length === 0) {
+        snapshotList.appendChild(snapshotEmpty);
+        updateSnapshotEmptyState();
+        return;
+    }
+
+    snapshots.forEach(function (snapshot, index) {
+        var item = document.createElement("article");
+        item.className = "snapshot-item";
+        item.title = "クリックしてプレビューに表示";
+        item.style.cursor = "pointer";
+
+        var meta = document.createElement("div");
+        meta.className = "snapshot-meta";
+
+        var title = document.createElement("div");
+        title.className = "snapshot-title";
+        title.textContent = "カード " + (index + 1);
+
+        var info = document.createElement("div");
+        info.className = "snapshot-info";
+
+        meta.appendChild(title);
+        meta.appendChild(info);
+
+        var preview = document.createElement("div");
+        preview.className = "snapshot-preview";
+
+        var img = document.createElement("img");
+        img.src = snapshot.dataUrl;
+        img.alt = "保存したカード " + (index + 1);
+
+        preview.appendChild(img);
+
+        item.appendChild(meta);
+        item.appendChild(preview);
+        item.addEventListener("click", function () {
+            showSnapshotPreview(snapshot);
+        });
+        snapshotList.appendChild(item);
+    });
+}
+
+function clearPreviewOverlay() {
+    previewSelectionCtx.clearRect(0, 0, previewSelectionCanvas.width, previewSelectionCanvas.height);
+}
+
+function drawPreviewLayer(layer) {
+    previewSelectionCtx.save();
+    previewSelectionCtx.translate(layer.centerX, layer.centerY);
+    previewSelectionCtx.rotate(layer.rotation * Math.PI / 180);
+    previewSelectionCtx.scale(layer.scale, layer.scale);
+    previewSelectionCtx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+    previewSelectionCtx.restore();
+}
+
+function redrawPreviewOverlay() {
+    clearPreviewOverlay();
+
+    for (var index = 0; index < previewLayers.length; index += 1) {
+        drawPreviewLayer(previewLayers[index]);
+    }
+
+    if (previewMode === "select" && previewSelection) {
+        previewSelectionCtx.save();
+        previewSelectionCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
+        previewSelectionCtx.fillStyle = "rgba(37, 99, 235, 0.10)";
+        previewSelectionCtx.lineWidth = 2;
+        previewSelectionCtx.setLineDash([8, 6]);
+        previewSelectionCtx.fillRect(previewSelection.x, previewSelection.y, previewSelection.width, previewSelection.height);
+        previewSelectionCtx.strokeRect(previewSelection.x, previewSelection.y, previewSelection.width, previewSelection.height);
+        previewSelectionCtx.restore();
+    }
+}
+
+function showSnapshotPreview(snapshot) {
+    var previewPanel = document.getElementById("previewPanel");
+    if (previewPanel) {
+        previewPanel.style.display = "block";
+    }
+
+    var image = new Image();
+    image.onload = function () {
+        previewImage = image;
+        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewCtx.fillStyle = "#ffffff";
+        previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+        var scale = Math.min(previewCanvas.width / image.naturalWidth, previewCanvas.height / image.naturalHeight);
+        var drawWidth = image.naturalWidth * scale;
+        var drawHeight = image.naturalHeight * scale;
+        var drawX = (previewCanvas.width - drawWidth) / 2;
+        var drawY = (previewCanvas.height - drawHeight) / 2;
+
+        previewCtx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+        previewLayers = [];
+        previewSelectedLayerIndex = -1;
+        previewSelecting = false;
+        previewSelection = null;
+        previewSelectionStart = null;
+        activePreviewTransform = null;
+        previewMode = "select";
+        previewSelectionCanvas.style.pointerEvents = "auto";
+        redrawPreviewOverlay();
+        setStatus("保存カードをプレビューに表示しました。範囲を選んで切り出し、反映先の描画キャンバスで自由変形できます。");
+    };
+    image.src = snapshot.dataUrl;
+}
+
+function resetPreview() {
+    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    previewCtx.fillStyle = "#ffffff";
+    previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+    previewSelectionCtx.clearRect(0, 0, previewSelectionCanvas.width, previewSelectionCanvas.height);
+    previewImage = null;
+    previewLayers = [];
+    previewSelectedLayerIndex = -1;
+    previewSelecting = false;
+    previewSelection = null;
+    previewSelectionStart = null;
+    activePreviewTransform = null;
+    previewMode = "idle";
+    previewSelectionCanvas.style.pointerEvents = "none";
+    var previewPanel = document.getElementById("previewPanel");
+    if (previewPanel) {
+        previewPanel.style.display = "none";
+    }
+}
+
+function createPreviewCrop(rect) {
+    if (!previewImage) {
+        return null;
+    }
+
+    var left = Math.max(0, Math.floor(rect.x));
+    var top = Math.max(0, Math.floor(rect.y));
+    var width = Math.min(previewCanvas.width - left, Math.ceil(rect.width));
+    var height = Math.min(previewCanvas.height - top, Math.ceil(rect.height));
+
+    if (width <= 0 || height <= 0) {
+        return null;
+    }
+
+    var cropCanvas = document.createElement("canvas");
+    cropCanvas.width = width;
+    cropCanvas.height = height;
+
+    var cropCtx = cropCanvas.getContext("2d");
+    var sourceImageData = previewCtx.getImageData(left, top, width, height);
+    var pixels = sourceImageData.data;
+
+    for (var index = 0; index < pixels.length; index += 4) {
+        var r = pixels[index];
+        var g = pixels[index + 1];
+        var b = pixels[index + 2];
+        if (r > 250 && g > 250 && b > 250) {
+            pixels[index + 3] = 0;
+        }
+    }
+
+    cropCtx.putImageData(sourceImageData, 0, 0);
+
+    return {
+        canvas: cropCanvas,
+        width: width,
+        height: height,
+        centerX: left + (width / 2),
+        centerY: top + (height / 2),
+        scale: 1,
+        rotation: 0,
+    };
+}
+
+function previewSelectLayerAtPoint(point) {
+    for (var index = previewLayers.length - 1; index >= 0; index -= 1) {
+        var layer = previewLayers[index];
+        var box = getLayerCorners(layer);
+        if (point.x >= box.minX && point.x <= box.maxX && point.y >= box.minY && point.y <= box.maxY) {
+            var layerItem = previewLayers.splice(index, 1)[0];
+            previewLayers.push(layerItem);
+            previewSelectedLayerIndex = previewLayers.length - 1;
+            return previewLayers[previewSelectedLayerIndex];
+        }
+    }
+    return null;
+}
+
+function startPreviewTransform(layer, event, type) {
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    activePreviewTransform = {
+        type: type,
+        layer: layer,
+        pointerId: event.pointerId,
+        startCenterX: layer.centerX,
+        startCenterY: layer.centerY,
+        startScale: layer.scale,
+        startRotation: layer.rotation,
+        startPointerX: point.x,
+        startPointerY: point.y,
+        startDistance: Math.max(24, Math.sqrt(Math.pow(point.x - layer.centerX, 2) + Math.pow(point.y - layer.centerY, 2))),
+        startAngle: Math.atan2(point.y - layer.centerY, point.x - layer.centerX),
+    };
+    previewSelectionCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+}
+
+function handlePreviewTransformMove(event) {
+    if (!activePreviewTransform || event.pointerId !== activePreviewTransform.pointerId) {
+        return;
+    }
+
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    var layer = activePreviewTransform.layer;
+
+    if (activePreviewTransform.type === "move") {
+        layer.centerX = activePreviewTransform.startCenterX + (point.x - activePreviewTransform.startPointerX);
+        layer.centerY = activePreviewTransform.startCenterY + (point.y - activePreviewTransform.startPointerY);
+        redrawPreviewOverlay();
+        return;
+    }
+
+    if (activePreviewTransform.type === "resize") {
+        var dx = point.x - activePreviewTransform.startCenterX;
+        var dy = point.y - activePreviewTransform.startCenterY;
+        var distance = Math.max(24, Math.sqrt(dx * dx + dy * dy));
+        layer.scale = Math.max(0.2, Math.min(8, activePreviewTransform.startScale * (distance / activePreviewTransform.startDistance)));
+        redrawPreviewOverlay();
+        return;
+    }
+
+    if (activePreviewTransform.type === "rotate") {
+        var angle = Math.atan2(point.y - activePreviewTransform.startCenterY, point.x - activePreviewTransform.startCenterX);
+        layer.rotation = activePreviewTransform.startRotation + ((angle - activePreviewTransform.startAngle) * 180 / Math.PI);
+        redrawPreviewOverlay();
+    }
+}
+
+function endPreviewTransform(event) {
+    if (!activePreviewTransform || event.pointerId !== activePreviewTransform.pointerId) {
+        return;
+    }
+
+    activePreviewTransform = null;
+    if (previewSelectionCanvas.hasPointerCapture(event.pointerId)) {
+        previewSelectionCanvas.releasePointerCapture(event.pointerId);
+    }
+}
+
+function beginPreviewSelection(event) {
+    previewSelecting = true;
+    previewSelectionCanvas.setPointerCapture(event.pointerId);
+
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    previewSelectionStart = point;
+    previewSelection = {
+        x: point.x,
+        y: point.y,
+        width: 0,
+        height: 0,
+    };
+    redrawPreviewOverlay();
+}
+
+function continuePreviewSelection(event) {
+    if (!previewSelecting) {
+        return;
+    }
+
+    previewSelection = normalizeRect(previewSelectionStart, getCanvasPoint(event, previewSelectionCanvas));
+    redrawPreviewOverlay();
+}
+
+function cutPreviewSelection() {
+    if (!previewSelection || previewSelection.width < 2 || previewSelection.height < 2) {
+        setStatus("範囲が小さすぎます。もう一度選んでください。");
+        return;
+    }
+
+    var crop = createPreviewCrop(previewSelection);
+    if (!crop) {
+        setStatus("選択した範囲から切り出せませんでした。");
+        return;
+    }
+
+    previewLayers.push(crop);
+    previewSelectedLayerIndex = previewLayers.length - 1;
+    previewSelecting = false;
+    previewSelection = {
+        x: previewSelection.x,
+        y: previewSelection.y,
+        width: previewSelection.width,
+        height: previewSelection.height,
+    };
+    previewSelectionStart = null;
+    previewMode = "select";
+    previewSelectionCanvas.style.pointerEvents = "auto";
+    redrawPreviewOverlay();
+    setStatus("プレビュー内の範囲を切り出しました。反映先の描画キャンバスで自由変形できます。");
+}
+
+function stopPreviewSelection(event) {
+    if (!previewSelecting) {
+        return;
+    }
+
+    previewSelecting = false;
+
+    if (previewSelectionCanvas.hasPointerCapture(event.pointerId)) {
+        previewSelectionCanvas.releasePointerCapture(event.pointerId);
+    }
+
+    if (previewSelection && (previewSelection.width < 2 || previewSelection.height < 2)) {
+        previewSelection = null;
+        redrawPreviewOverlay();
+        setStatus("範囲が小さすぎます。もう一度、少し広めに選んでください。");
+        return;
+    }
+
+    if (previewSelection) {
+        cutPreviewSelection();
+    }
+}
+
+previewSelectionCanvas.addEventListener("pointerdown", function (event) {
+    if (previewMode !== "select") {
+        return;
+    }
+
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    previewSelection = null;
+    previewSelectionStart = point;
+    previewSelection = {
+        x: point.x,
+        y: point.y,
+        width: 0,
+        height: 0,
+    };
+    beginPreviewSelection(event);
+});
+
+previewSelectionCanvas.addEventListener("pointermove", function (event) {
+    if (previewSelecting) {
+        continuePreviewSelection(event);
+    }
+});
+
+previewSelectionCanvas.addEventListener("pointerup", function (event) {
+    if (previewSelecting) {
+        stopPreviewSelection(event);
+    }
+});
+
+previewSelectionCanvas.addEventListener("pointercancel", function (event) {
+    if (previewSelecting) {
+        stopPreviewSelection(event);
+    }
+});
+
+previewSelectionCanvas.addEventListener("pointerleave", function (event) {
+    if (previewSelecting) {
+        stopPreviewSelection(event);
+    }
+});
+
+previewSelectButton.addEventListener("click", function () {
+    if (!previewImage) {
+        setStatus("先に保存カードを選んでプレビューを開いてください。");
+        return;
+    }
+    previewMode = "select";
+    previewSelectionCanvas.style.pointerEvents = "auto";
+    redrawPreviewOverlay();
+    setStatus("プレビューで範囲指定を開始しました。切り出した後、描画キャンバスで自由変形できます。");
+});
+
+
+function cloneLayerForMainCanvas(layer) {
+    var clonedCanvas = document.createElement("canvas");
+    clonedCanvas.width = layer.width;
+    clonedCanvas.height = layer.height;
+
+    var clonedCtx = clonedCanvas.getContext("2d");
+    clonedCtx.clearRect(0, 0, clonedCanvas.width, clonedCanvas.height);
+    clonedCtx.drawImage(layer.canvas, 0, 0);
+
+    return {
+        canvas: clonedCanvas,
+        width: layer.width,
+        height: layer.height,
+        centerX: layer.centerX,
+        centerY: layer.centerY,
+        scale: layer.scale,
+        rotation: layer.rotation,
+    };
+}
+
+function applyPreviewLayersToCanvas() {
+    if (!previewImage || previewLayers.length === 0) {
+        setStatus("プレビューで反映する要素がありません。");
+        return;
+    }
+
+    var nextLayers = previewLayers.map(cloneLayerForMainCanvas);
+    layers = layers.concat(nextLayers);
+    selectedLayerIndex = layers.length - 1;
+    mode = "select";
+    drawing = false;
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    setActiveButton(selectButton);
+    ensureOverlayPointerEvents();
+    redrawOverlay();
+    resetPreview();
+    setStatus("プレビューの内容を描画キャンバスへ反映しました。ドラッグして位置を調整できます。");
+}
+
+previewApplyButton.addEventListener("click", function () {
+    applyPreviewLayersToCanvas();
+});
+
+previewClearButton.addEventListener("click", function () {
+    resetPreview();
+    setStatus("プレビューを閉じました。保存カード一覧から選べます。");
+});
+
+function ensureOverlayPointerEvents() {
+    selectionCanvas.style.pointerEvents = mode === "select" ? "auto" : "none";
+}
+
+function getLayerDisplaySize(layer) {
+    return {
+        width: layer.width * layer.scale,
+        height: layer.height * layer.scale,
+    };
+}
+
+function getLayerCorners(layer) {
+    var size = getLayerDisplaySize(layer);
+    var halfWidth = size.width / 2;
+    var halfHeight = size.height / 2;
+    var angle = layer.rotation * Math.PI / 180;
+    var cos = Math.cos(angle);
+    var sin = Math.sin(angle);
+    var points = [
+        { x: -halfWidth, y: -halfHeight },
+        { x: halfWidth, y: -halfHeight },
+        { x: halfWidth, y: halfHeight },
+        { x: -halfWidth, y: halfHeight },
+    ];
+    var xs = [];
+    var ys = [];
+
+    points.forEach(function (point) {
+        var x = point.x * cos - point.y * sin;
+        var y = point.x * sin + point.y * cos;
+        xs.push(layer.centerX + x);
+        ys.push(layer.centerY + y);
+    });
+
+    return {
+        minX: Math.min.apply(null, xs),
+        minY: Math.min.apply(null, ys),
+        maxX: Math.max.apply(null, xs),
+        maxY: Math.max.apply(null, ys),
+    };
+}
+
+function transformPoint(layer, localX, localY) {
+    var angle = layer.rotation * Math.PI / 180;
+    var x = (localX - (layer.width / 2)) * layer.scale;
+    var y = (localY - (layer.height / 2)) * layer.scale;
+    var cos = Math.cos(angle);
+    var sin = Math.sin(angle);
+
+    return {
+        x: layer.centerX + (x * cos - y * sin),
+        y: layer.centerY + (x * sin + y * cos),
+    };
+}
+
+function drawLayer(layer) {
+    selectionCtx.save();
+    selectionCtx.translate(layer.centerX, layer.centerY);
+    selectionCtx.rotate(layer.rotation * Math.PI / 180);
+    selectionCtx.scale(layer.scale, layer.scale);
+    selectionCtx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+    selectionCtx.restore();
+}
+
+function drawSelectionRect() {
+    if (!currentSelection) {
+        return;
+    }
+
+    selectionCtx.save();
+    selectionCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
+    selectionCtx.fillStyle = "rgba(37, 99, 235, 0.10)";
+    selectionCtx.lineWidth = 2;
+    selectionCtx.setLineDash([8, 6]);
+    selectionCtx.fillRect(currentSelection.x, currentSelection.y, currentSelection.width, currentSelection.height);
+    selectionCtx.strokeRect(currentSelection.x, currentSelection.y, currentSelection.width, currentSelection.height);
+    selectionCtx.restore();
+}
+
+function drawSelectionOutline(layer) {
+    var box = getLayerCorners(layer);
+
+    selectionCtx.save();
+    selectionCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
+    selectionCtx.lineWidth = 2;
+    selectionCtx.setLineDash([8, 6]);
+    selectionCtx.strokeRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
+    selectionCtx.restore();
+
+    var rotateHandle = transformPoint(layer, layer.width / 2, -28 / layer.scale);
+    var resizeHandle = transformPoint(layer, layer.width + 14 / layer.scale, layer.height + 14 / layer.scale);
+
+    selectionCtx.save();
+    selectionCtx.fillStyle = "#14b8a6";
+    selectionCtx.strokeStyle = "#ffffff";
+    selectionCtx.lineWidth = 2;
+    selectionCtx.beginPath();
+    selectionCtx.arc(rotateHandle.x, rotateHandle.y, 8, 0, Math.PI * 2);
+    selectionCtx.fill();
+    selectionCtx.stroke();
+    selectionCtx.beginPath();
+    selectionCtx.arc(resizeHandle.x, resizeHandle.y, 8, 0, Math.PI * 2);
+    selectionCtx.fill();
+    selectionCtx.stroke();
+    selectionCtx.restore();
+}
+
+function redrawOverlay() {
+    clearOverlay();
+
+    for (var index = 0; index < layers.length; index += 1) {
+        drawLayer(layers[index]);
+    }
+
+    if (mode === "select" && selecting && currentSelection) {
+        drawSelectionRect();
+    }
+
+    if (selectedLayerIndex >= 0 && layers[selectedLayerIndex]) {
+        drawSelectionOutline(layers[selectedLayerIndex]);
+    }
+}
+
+function setTool(nextTool) {
+    mode = "draw";
+    drawing = false;
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    clearOverlay();
+    ensureOverlayPointerEvents();
+    
+    if (nextTool === "eraser" &&
+        selectedLayerIndex >= 0 &&
+        layers[selectedLayerIndex]) {
+
+        layers.splice(selectedLayerIndex, 1);
+        selectedLayerIndex = -1;
+    }
+
+    if (nextTool === "pen") {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.lineWidth = 6;
+        setActiveButton(penButton);
+        setStatus("描画モードです。文字を書いてから範囲指定してください。");
+        return;
+    }
+
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.lineWidth = 28;
+    setActiveButton(eraserButton);
+    setStatus("消しゴムモードです。ドラッグすると線を消せます。");
+}
+
+function setSelectMode() {
+    mode = "select";
+    drawing = false;
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    setActiveButton(selectButton);
+    ensureOverlayPointerEvents();
+    redrawOverlay();
+    setStatus("範囲指定モードです。ドラッグして囲んでください。");
+}
+
+function startDrawing(event) {
+    if (mode !== "draw") {
+        return;
+    }
+
+    drawing = true;
+    canvas.setPointerCapture(event.pointerId);
+
+    var point = getCanvasPoint(event, canvas);
+    ctx.beginPath();
+    ctx.moveTo(point.x, point.y);
+}
+
+function continueDrawing(event) {
+    if (!drawing || mode !== "draw") {
+        return;
+    }
+
+    var point = getCanvasPoint(event, canvas);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+}
+
+function stopDrawing(event) {
+    if (!drawing) {
+        return;
+    }
+
+    drawing = false;
+    ctx.closePath();
+
+    if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+    }
+}
+
+function makeCropCanvas(rect) {
+    var left = Math.max(0, Math.floor(rect.x));
+    var top = Math.max(0, Math.floor(rect.y));
+    var width = Math.min(canvas.width - left, Math.ceil(rect.width));
+    var height = Math.min(canvas.height - top, Math.ceil(rect.height));
+
+    if (width <= 0 || height <= 0) {
+        return null;
+    }
+
+    var cropCanvas = document.createElement("canvas");
+    cropCanvas.width = width;
+    cropCanvas.height = height;
+
+    var cropCtx = cropCanvas.getContext("2d");
+    cropCtx.drawImage(canvas, left, top, width, height, 0, 0, width, height);
+
+    var imageData = cropCtx.getImageData(0, 0, width, height);
+    var pixels = imageData.data;
+
+    for (var index = 0; index < pixels.length; index += 4) {
+        if (pixels[index] > 250 && pixels[index + 1] > 250 && pixels[index + 2] > 250) {
+            pixels[index + 3] = 0;
+        }
+    }
+
+    cropCtx.putImageData(imageData, 0, 0);
+
+    return {
+        canvas: cropCanvas,
+        width: width,
+        height: height,
+        centerX: left + (width / 2),
+        centerY: top + (height / 2),
+        scale: 1,
+        rotation: 0,
+    };
+}
+
+function clearSourceRect(rect) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.restore();
+}
+
+function beginSelection(event) {
+    selecting = true;
+    selectionCanvas.setPointerCapture(event.pointerId);
+
+    var point = getCanvasPoint(event, selectionCanvas);
+    selectionStart = point;
+    currentSelection = {
+        x: point.x,
+        y: point.y,
+        width: 0,
+        height: 0,
+    };
+    redrawOverlay();
+}
+
+function continueSelection(event) {
+    if (!selecting) {
+        return;
+    }
+
+    currentSelection = normalizeRect(selectionStart, getCanvasPoint(event, selectionCanvas));
+    redrawOverlay();
+}
+
+function stopSelection(event) {
+    if (!selecting) {
+        return;
+    }
+
+    selecting = false;
+
+    if (selectionCanvas.hasPointerCapture(event.pointerId)) {
+        selectionCanvas.releasePointerCapture(event.pointerId);
+    }
+
+    if (currentSelection && (currentSelection.width < 2 || currentSelection.height < 2)) {
+        currentSelection = null;
+        redrawOverlay();
+        setStatus("範囲が小さすぎます。もう一度、少し広めに囲ってください。");
+        return;
+    }
+
+    if (currentSelection) {
+        cutSelection();
+    }
+}
+
+function getLayerHandlePositions(layer) {
+    return {
+        rotate: transformPoint(layer, layer.width / 2, -28 / layer.scale),
+        resize: transformPoint(layer, layer.width + 14 / layer.scale, layer.height + 14 / layer.scale),
+    };
+}
+
+function hitTestLayer(layer, point) {
+    var box = getLayerCorners(layer);
+    return point.x >= box.minX && point.x <= box.maxX && point.y >= box.minY && point.y <= box.maxY;
+}
+
+function bringLayerToFront(index) {
+    if (index < 0 || index >= layers.length) {
+        return;
+    }
+
+    if (index === layers.length - 1) {
+        selectedLayerIndex = index;
+        return;
+    }
+
+    var layer = layers.splice(index, 1)[0];
+    layers.push(layer);
+    selectedLayerIndex = layers.length - 1;
+}
+
+function startTransform(layer, event, type) {
+    var point = getCanvasPoint(event, selectionCanvas);
+    activeTransform = {
+        type: type,
+        layer: layer,
+        pointerId: event.pointerId,
+        startCenterX: layer.centerX,
+        startCenterY: layer.centerY,
+        startScale: layer.scale,
+        startRotation: layer.rotation,
+        startPointerX: point.x,
+        startPointerY: point.y,
+        startDistance: Math.max(24, Math.sqrt(Math.pow(point.x - layer.centerX, 2) + Math.pow(point.y - layer.centerY, 2))),
+        startAngle: Math.atan2(point.y - layer.centerY, point.x - layer.centerX),
+    };
+
+    selectionCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+}
+
+function startMove(layer, event) {
+    startTransform(layer, event, "move");
+}
+
+function startResize(layer, event) {
+    startTransform(layer, event, "resize");
+}
+
+function startRotate(layer, event) {
+    startTransform(layer, event, "rotate");
+}
+
+function handleTransformMove(event) {
+    if (!activeTransform || event.pointerId !== activeTransform.pointerId) {
+        return;
+    }
+
+    var point = getCanvasPoint(event, selectionCanvas);
+    var layer = activeTransform.layer;
+
+    if (activeTransform.type === "move") {
+        layer.centerX = activeTransform.startCenterX + (point.x - activeTransform.startPointerX);
+        layer.centerY = activeTransform.startCenterY + (point.y - activeTransform.startPointerY);
+        redrawOverlay();
+        return;
+    }
+
+    if (activeTransform.type === "resize") {
+        var dx = point.x - activeTransform.startCenterX;
+        var dy = point.y - activeTransform.startCenterY;
+        var distance = Math.max(24, Math.sqrt(dx * dx + dy * dy));
+        layer.scale = Math.max(0.2, Math.min(8, activeTransform.startScale * (distance / activeTransform.startDistance)));
+        redrawOverlay();
+        return;
+    }
+
+    if (activeTransform.type === "rotate") {
+        var angle = Math.atan2(point.y - activeTransform.startCenterY, point.x - activeTransform.startCenterX);
+        layer.rotation = activeTransform.startRotation + ((angle - activeTransform.startAngle) * 180 / Math.PI);
+        redrawOverlay();
+    }
+}
+
+function endTransform(event) {
+    if (!activeTransform || event.pointerId !== activeTransform.pointerId) {
+        return;
+    }
+
+    activeTransform = null;
+    if (selectionCanvas.hasPointerCapture(event.pointerId)) {
+        selectionCanvas.releasePointerCapture(event.pointerId);
+    }
+}
+
+function selectLayerAtPoint(point) {
+    for (var index = layers.length - 1; index >= 0; index -= 1) {
+        if (!hitTestLayer(layers[index], point)) {
+            continue;
+        }
+
+        bringLayerToFront(index);
+        return layers[selectedLayerIndex];
+    }
+
+    return null;
+}
+
+function commitSelectionLayer() {
+    if (selectedLayerIndex < 0 || !layers[selectedLayerIndex]) {
+        setStatus("確定する切り出しがありません。");
+        return;
+    }
+
+    var layer = layers[selectedLayerIndex];
+
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.translate(layer.centerX, layer.centerY);
+    ctx.rotate(layer.rotation * Math.PI / 180);
+    ctx.scale(layer.scale, layer.scale);
+    ctx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+    ctx.restore();
+
+    layers.splice(selectedLayerIndex, 1);
+    selectedLayerIndex = -1;
+    redrawOverlay();
+    setStatus("自由変形を確定しました。続けて範囲指定すると、また移動できます。");
+}
+
+function cutSelection() {
+    if (!currentSelection || currentSelection.width < 2 || currentSelection.height < 2) {
+        setStatus("先に範囲指定で1文字を囲ってください。");
+        return;
+    }
+
+    var crop = makeCropCanvas(currentSelection);
+    if (!crop) {
+        setStatus("切り出しに失敗しました。もう一度試してください。");
+        return;
+    }
+
+    clearSourceRect(currentSelection);
+    layers.push(crop);
+    selectedLayerIndex = layers.length - 1;
+    mode = "select";
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    setActiveButton(selectButton);
+    ensureOverlayPointerEvents();
+    redrawOverlay();
+    setStatus("切り出しました。移動や拡大縮小をしてから『確定』で固定できます。");
+}
+
+function flattenLayers() {
+    if (layers.length === 0) {
+        setStatus("確定する文字がありません。");
+        return;
+    }
+
+    for (var index = 0; index < layers.length; index += 1) {
+        var layer = layers[index];
+        ctx.save();
+        ctx.translate(layer.centerX, layer.centerY);
+        ctx.rotate(layer.rotation * Math.PI / 180);
+        ctx.scale(layer.scale, layer.scale);
+        ctx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+        ctx.restore();
+    }
+
+    layers = [];
+    selectedLayerIndex = -1;
+    redrawOverlay();
+    setTool("pen");
+    setStatus("複数の切り出しをCanvasへまとめて配置しました。");
+}
+
+function renderCurrentCanvasSnapshot() {
+    var snapshotCanvas = document.createElement("canvas");
+    snapshotCanvas.width = canvas.width;
+    snapshotCanvas.height = canvas.height;
+
+    var snapshotCtx = snapshotCanvas.getContext("2d");
+    snapshotCtx.fillStyle = "#ffffff";
+    snapshotCtx.fillRect(0, 0, snapshotCanvas.width, snapshotCanvas.height);
+    snapshotCtx.drawImage(canvas, 0, 0);
+
+    for (var index = 0; index < layers.length; index += 1) {
+        var layer = layers[index];
+        snapshotCtx.save();
+        snapshotCtx.translate(layer.centerX, layer.centerY);
+        snapshotCtx.rotate(layer.rotation * Math.PI / 180);
+        snapshotCtx.scale(layer.scale, layer.scale);
+        snapshotCtx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+        snapshotCtx.restore();
+    }
+
+    return {
+        dataUrl: snapshotCanvas.toDataURL("image/png"),
+        width: snapshotCanvas.width,
+        height: snapshotCanvas.height,
+    };
+}
+
+function flattenLayersIntoCanvas() {
+    if (layers.length === 0) {
+        return;
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+
+    for (var index = 0; index < layers.length; index += 1) {
+        var layer = layers[index];
+        ctx.save();
+        ctx.translate(layer.centerX, layer.centerY);
+        ctx.rotate(layer.rotation * Math.PI / 180);
+        ctx.scale(layer.scale, layer.scale);
+        ctx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
+        ctx.restore();
+    }
+
+    ctx.restore();
+    layers = [];
+    selectedLayerIndex = -1;
+    redrawOverlay();
+}
+
+function resetWorkingCanvas() {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    layers = [];
+    selectedLayerIndex = -1;
+    activeTransform = null;
+    mode = "draw";
+    drawing = false;
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    clearOverlay();
+    ensureOverlayPointerEvents();
+    setTool("pen");
+}
+
+penButton.addEventListener("click", function () {
+    setTool("pen");
+});
+
+eraserButton.addEventListener("click", function () {
+    setTool("eraser");
+});
+
+selectButton.addEventListener("click", function () {
+    mode = "select";
+    drawing = false;
+    selecting = false;
+    currentSelection = null;
+    selectionStart = null;
+    setActiveButton(selectButton);
+    ensureOverlayPointerEvents();
+    redrawOverlay();
+    setStatus("範囲指定モードです。ドラッグして囲んでください。");
+});
+
+commitButton.addEventListener("click", function () {
+    commitSelectionLayer();
+});
+
+applyButton.addEventListener("click", function () {
+    flattenLayersIntoCanvas();
+    var snapshot = renderCurrentCanvasSnapshot();
+    snapshots.unshift(snapshot);
+    saveSnapshotsToStorage();
+    renderSnapshotList();
+    resetWorkingCanvas();
+    setStatus("現在のキャンバスを保存して、新しいキャンバスを開始しました。");
+});
+
+clearButton.addEventListener("click", function () {
+    resetWorkingCanvas();
+    setStatus("Canvasを消去しました。");
+});
+
+canvas.addEventListener("pointerdown", startDrawing);
+canvas.addEventListener("pointermove", continueDrawing);
+canvas.addEventListener("pointerup", stopDrawing);
+canvas.addEventListener("pointercancel", stopDrawing);
+canvas.addEventListener("pointerleave", stopDrawing);
+
+selectionCanvas.addEventListener("pointerdown", function (event) {
+    if (mode !== "select") {
+        return;
+    }
+
+    var point = getCanvasPoint(event, selectionCanvas);
+
+    if (selectedLayerIndex >= 0 && layers[selectedLayerIndex]) {
+        var handles = getLayerHandlePositions(layers[selectedLayerIndex]);
+        var rotateDistance = Math.sqrt(Math.pow(point.x - handles.rotate.x, 2) + Math.pow(point.y - handles.rotate.y, 2));
+        var resizeDistance = Math.sqrt(Math.pow(point.x - handles.resize.x, 2) + Math.pow(point.y - handles.resize.y, 2));
+
+        if (rotateDistance <= 14) {
+            startRotate(layers[selectedLayerIndex], event);
+            return;
+        }
+
+        if (resizeDistance <= 14) {
+            startResize(layers[selectedLayerIndex], event);
+            return;
+        }
+
+        if (hitTestLayer(layers[selectedLayerIndex], point)) {
+            startMove(layers[selectedLayerIndex], event);
+            return;
+        }
+    }
+
+    var selectedLayer = selectLayerAtPoint(point);
+    if (selectedLayer) {
+        redrawOverlay();
+        var layerHandles = getLayerHandlePositions(selectedLayer);
+        var rotateHit = Math.sqrt(Math.pow(point.x - layerHandles.rotate.x, 2) + Math.pow(point.y - layerHandles.rotate.y, 2));
+        var resizeHit = Math.sqrt(Math.pow(point.x - layerHandles.resize.x, 2) + Math.pow(point.y - layerHandles.resize.y, 2));
+
+        if (rotateHit <= 14) {
+            startRotate(selectedLayer, event);
+            return;
+        }
+
+        if (resizeHit <= 14) {
+            startResize(selectedLayer, event);
+            return;
+        }
+
+        startMove(selectedLayer, event);
+        return;
+    }
+
+    beginSelection(event);
+});
+
+selectionCanvas.addEventListener("pointermove", function (event) {
+    if (activeTransform) {
+        handleTransformMove(event);
+        return;
+    }
+
+    if (selecting) {
+        continueSelection(event);
+    }
+});
+
+selectionCanvas.addEventListener("pointerup", function (event) {
+    if (activeTransform) {
+        endTransform(event);
+        return;
+    }
+
+    if (selecting) {
+        stopSelection(event);
+    }
+});
+
+selectionCanvas.addEventListener("pointercancel", function (event) {
+    if (activeTransform) {
+        endTransform(event);
+        return;
+    }
+
+    if (selecting) {
+        stopSelection(event);
+    }
+});
+
+selectionCanvas.addEventListener("pointerleave", function (event) {
+    if (activeTransform) {
+        endTransform(event);
+    }
+});
+
+window.addEventListener("resize", function () {
+    redrawOverlay();
+});
+
+ctx.fillStyle = "#ffffff";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+resetPreview();
+
+// キーボード登録データはブラウザ内(localStorage)に保存します。
+var registerKeyboardButton = document.getElementById("registerKeyboard");
+var toggleKeyboardButton = document.getElementById("toggleKeyboard");
+var keyboardPanel = document.getElementById("keyboardPanel");
+var keyboardGrid = document.getElementById("keyboardGrid");
+var registerDialog = document.getElementById("registerDialog");
+var registerKana = document.getElementById("registerKana");
+var confirmRegisterButton = document.getElementById("confirmRegister");
+var cancelRegisterButton = document.getElementById("cancelRegister");
+var kanaKeys = ["あ","い","う","え","お","か","き","く","け","こ","さ","し","す","せ","そ","た","ち","つ","て","と","な","に","ぬ","ね","の","は","ひ","ふ","へ","ほ","ま","み","む","め","も","や","ゆ","よ","ら","り","る","れ","ろ","わ","を","ん","が","ぎ","ぐ","げ","ご","ざ","じ","ず","ぜ","ぞ","だ","ぢ","づ","で","ど","ば","び","ぶ","べ","ぼ","ぱ","ぴ","ぷ","ぺ","ぽ"];
+var registeredGlyphs = {};
+var registerTargetLayer = null;
+try { registeredGlyphs = JSON.parse(localStorage.getItem("handwritingKeyboardGlyphs_v1") || "{}"); } catch (error) { registeredGlyphs = {}; }
+kanaKeys.forEach(function (kana) { var option = document.createElement("option"); option.value = kana; option.textContent = kana; registerKana.appendChild(option); });
+function saveRegisteredGlyphs() { try { localStorage.setItem("handwritingKeyboardGlyphs_v1", JSON.stringify(registeredGlyphs)); return true; } catch (error) { setStatus("登録データを保存できませんでした。文字画像が大きすぎる可能性があります。"); return false; } }
+function renderHandwritingKeyboard() {
+ keyboardGrid.innerHTML = "";
+ kanaKeys.forEach(function (kana) {
+  var key = document.createElement("button"); key.type = "button"; key.className = "keyboard-key";
+  var label = document.createElement("span"); label.className = "key-label"; label.textContent = kana; key.appendChild(label);
+  var glyphs = registeredGlyphs[kana];
+  if (glyphs && glyphs.length) { var glyph = glyphs[glyphs.length - 1]; key.classList.add("registered"); var image = document.createElement("img"); image.src = glyph.dataUrl; image.alt = kana + "の手書き文字"; key.insertBefore(image,label); key.addEventListener("click", function () { addRegisteredGlyphToCard(glyph.dataUrl,kana); }); }
+  else { key.disabled = true; }
+  keyboardGrid.appendChild(key);
+ });
+}
+function addRegisteredGlyphToCard(dataUrl,kana) {
+ var image = new Image(); image.onload = function () {
+  var glyphCanvas = document.createElement("canvas"); glyphCanvas.width = image.naturalWidth || image.width; glyphCanvas.height = image.naturalHeight || image.height; glyphCanvas.getContext("2d").drawImage(image,0,0);
+  var scale = Math.min(105/glyphCanvas.width,105/glyphCanvas.height,1);
+  layers.push({canvas:glyphCanvas,width:glyphCanvas.width,height:glyphCanvas.height,centerX:canvas.width/2,centerY:canvas.height/2,scale:scale,rotation:0});
+  selectedLayerIndex = layers.length-1; mode="select"; setActiveButton(selectButton); ensureOverlayPointerEvents(); redrawOverlay(); setStatus("「"+kana+"」の手書き文字をカードに追加しました。ドラッグで位置を調整できます。");
+ }; image.src = dataUrl;
+}
+registerKeyboardButton.addEventListener("click", function () { if (selectedLayerIndex < 0 || !layers[selectedLayerIndex]) { setStatus("先に文字を切り出して選択してください。"); return; } registerTargetLayer = layers[selectedLayerIndex]; registerDialog.classList.add("visible"); });
+cancelRegisterButton.addEventListener("click", function () { registerDialog.classList.remove("visible"); registerTargetLayer=null; });
+confirmRegisterButton.addEventListener("click", function () { if (!registerTargetLayer) return; var c=document.createElement("canvas"); c.width=registerTargetLayer.canvas.width; c.height=registerTargetLayer.canvas.height; c.getContext("2d").drawImage(registerTargetLayer.canvas,0,0); var kana=registerKana.value; if(!registeredGlyphs[kana]) registeredGlyphs[kana]=[]; registeredGlyphs[kana].push({dataUrl:c.toDataURL("image/png"),savedAt:Date.now()}); if(saveRegisteredGlyphs()){renderHandwritingKeyboard();setStatus("「"+kana+"」をキーボードに登録しました。");} registerDialog.classList.remove("visible"); registerTargetLayer=null; });
+toggleKeyboardButton.addEventListener("click", function () { var visible=keyboardPanel.classList.toggle("visible"); toggleKeyboardButton.textContent=visible?"キーボードを隠す":"キーボードを表示"; if(visible) renderHandwritingKeyboard(); });
+renderHandwritingKeyboard();
+
+setTool("pen");
+ensureOverlayPointerEvents();
+redrawOverlay();
+loadSnapshotsFromStorage();
+renderSnapshotList();
+
+</script>
+
+
+</body>
+
+</html>

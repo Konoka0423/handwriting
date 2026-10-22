@@ -448,6 +448,72 @@ button.destructive {
         backdrop-filter: blur(10px);
     }
 }
+
+/* ナビゲーションバー */
+.site-nav {
+  width: min(1100px, calc(100% - 28px));
+  margin: 16px auto 24px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  border: 1px solid #dedede;
+  border-radius: 16px;
+  background: #f7f7f7;
+  box-sizing: border-box;
+}
+
+.site-nav a {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 10px;
+  border-radius: 11px;
+  text-decoration: none;
+  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.site-nav a:hover {
+  background: #e9e9e9;
+}
+
+/* 現在開いているページ */
+.site-nav a.active {
+  background: #252525;
+  color: #fff;
+}
+
+.site-nav .nav-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* スマートフォン対応 */
+@media (max-width: 520px) {
+  .site-nav {
+    width: calc(100% - 20px);
+    margin: 10px auto 18px;
+    padding: 5px;
+    gap: 5px;
+  }
+
+  .site-nav a {
+    padding: 11px 5px;
+    gap: 5px;
+    font-size: 13px;
+  }
+
+  .site-nav .nav-icon {
+    display: none;
+  }
+}
+
 </style>
 
 </head>
@@ -455,6 +521,18 @@ button.destructive {
 
 <body>
 
+    <!-- ナビゲーションバー -->
+<nav class="site-nav" aria-label="メインナビゲーション">
+  <a href="index.html" class="active">
+    <span class="nav-icon">✎</span>
+    <span>メッセージを書く</span>
+  </a>
+
+  <a href="keybord.html">
+    <span class="nav-icon">▤</span>
+    <span>みんなのメッセージ</span>
+  </a>
+</nav>
 
 <main>
     <header>
@@ -1716,4 +1794,5 @@ renderSnapshotList();
 
 
 </body>
+
 </html>
