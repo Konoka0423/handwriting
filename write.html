@@ -448,14 +448,8 @@ button.destructive {
         backdrop-filter: blur(10px);
     }
 }
-.keyboard-tools {
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    margin:18px 0 10px;
-    position:relative;
-    z-index:6;
-}
+
+
 #keyboardPanel {
     display:none;
     position:relative;
@@ -467,19 +461,99 @@ button.destructive {
     background:#fff;
 }
 #keyboardPanel.visible { display:block; }
-.keyboard-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:6px; }
-.keyboard-key { min-height:62px; padding:5px 2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:1px solid #d1d5db; border-radius:8px; background:#f8fafc; color:#111827; }
-.keyboard-key .key-label { font-size:18px; }
-.keyboard-key img { width:34px; height:34px; object-fit:contain; }
-.keyboard-key.registered { background:#fff; border-color:#6b7280; }
-.keyboard-key:disabled { opacity:.5; background:#f3f4f6; cursor:not-allowed; }
-.keyboard-key:disabled .key-label { color:#777; }
-#registerDialog { display:none; position:fixed; inset:0; z-index:1000; background:#0008; align-items:center; justify-content:center; padding:16px; }
-#registerDialog.visible { display:flex; }
-.register-box { width:min(420px,100%); background:#fff; border-radius:14px; padding:22px; box-shadow:0 10px 40px #0003; }
-.register-box select { width:100%; padding:12px; margin:12px 0; font-size:18px; }
-.register-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
-@media(max-width:600px) { .keyboard-grid { grid-template-columns:repeat(5,minmax(0,1fr)); } .keyboard-key { min-height:56px; } }
+.keyboard-grid {
+    display: grid;
+    grid-template-columns: repeat(17, minmax(0, 1fr));
+    gap: 4px;
+    min-width: 720px;
+}
+
+#keyboardPanel {
+    overflow-x: auto;
+}
+
+.keyboard-key {
+    min-width: 0;
+    min-height: 42px;
+    padding: 3px 1px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #e5e5e5;
+    color: #222;
+}
+
+.keyboard-key .key-label {
+    font-size: 16px;
+}
+
+.keyboard-key img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.keyboard-key.registered { 
+    background:#fff; 
+    border-color:#6b7280; 
+}
+
+.keyboard-key:disabled { 
+    opacity:.5; 
+    background:#f3f4f6; 
+    cursor:not-allowed; 
+}
+
+.keyboard-key:disabled .key-label { 
+    color:#777; 
+}
+
+#registerDialog { 
+    display:none; 
+    position:fixed; 
+    inset:0; z-index:1000; 
+    background:#0008; 
+    align-items:center; 
+    justify-content:center; 
+    padding:16px; 
+}
+#registerDialog.visible { 
+    display:flex; 
+}
+
+.register-box { 
+    width:min(420px,100%); 
+    background:#fff; 
+    border-radius:14px; 
+    padding:22px; 
+    box-shadow:0 10px 40px #0003; 
+}
+
+.register-box select { 
+    width:100%; 
+    padding:12px; 
+    margin:12px 0; 
+    font-size:18px; 
+}
+
+.register-actions { 
+    display:flex; 
+    flex-wrap:wrap; 
+    gap:8px; 
+    justify-content:flex-end; 
+}
+
+@media(max-width:600px) { 
+    .keyboard-grid { grid-template-columns:repeat(5,minmax(0,1fr)); 
+    }
+    .keyboard-key { 
+        min-height:56px; 
+    }
+}
 
 /* ナビゲーションバー */
 .site-nav {
@@ -587,10 +661,11 @@ button.destructive {
             <button id="clear" class="destructive">消去</button>
         </div>
 
-        <div class="keyboard-tools">
+        <div class="controls">
             <button type="button" id="registerKeyboard">キーボードに登録</button>
             <button type="button" id="toggleKeyboard">キーボードを表示</button>
         </div>
+
         <section id="keyboardPanel" aria-label="手書き文字キーボード">
             <h2>手書き文字キーボード</h2>
             <p>登録済みの文字を押すと、編集中のカードに追加されます。薄い文字は未登録です。</p>
@@ -1888,15 +1963,59 @@ try { registeredGlyphs = JSON.parse(localStorage.getItem("handwritingKeyboardGly
 kanaKeys.forEach(function (kana) { var option = document.createElement("option"); option.value = kana; option.textContent = kana; registerKana.appendChild(option); });
 function saveRegisteredGlyphs() { try { localStorage.setItem("handwritingKeyboardGlyphs_v1", JSON.stringify(registeredGlyphs)); return true; } catch (error) { setStatus("登録データを保存できませんでした。文字画像が大きすぎる可能性があります。"); return false; } }
 function renderHandwritingKeyboard() {
- keyboardGrid.innerHTML = "";
- kanaKeys.forEach(function (kana) {
-  var key = document.createElement("button"); key.type = "button"; key.className = "keyboard-key";
-  var label = document.createElement("span"); label.className = "key-label"; label.textContent = kana; key.appendChild(label);
-  var glyphs = registeredGlyphs[kana];
-  if (glyphs && glyphs.length) { var glyph = glyphs[glyphs.length - 1]; key.classList.add("registered"); var image = document.createElement("img"); image.src = glyph.dataUrl; image.alt = kana + "の手書き文字"; key.insertBefore(image,label); key.addEventListener("click", function () { addRegisteredGlyphToCard(glyph.dataUrl,kana); }); }
-  else { key.disabled = true; }
-  keyboardGrid.appendChild(key);
- });
+    keyboardGrid.innerHTML = "";
+
+    // 1行につき18マス。空文字は空白として配置する
+    var keyboardRows = [
+        ["っ","ゃ","ぱ","ば","だ","ざ","が","わ","ら","や","ま","は","な","た","さ","か","あ"],
+        ["わ","","ぴ","び","ぢ","じ","ぎ","を","り","","み","ひ","に","ち","し","き","い"],
+        ["","ゆ","ぷ","ぶ","づ","ず","ぐ","ん","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
+        ["","","ぺ","べ","で","ぜ","げ","","れ","","め","へ","ね","て","せ","け","え"],
+        ["","よ","ぽ","ぼ","ど","ぞ","ご","","ろ","よ","も","ほ","の","と","そ","こ","お"]
+    ];
+
+    keyboardRows.forEach(function (row) {
+        row.forEach(function (kana) {
+            var key = document.createElement("button");
+            key.type = "button";
+            key.className = "keyboard-key";
+
+            // 空欄も1マス分の場所を確保する
+            if (kana === "") {
+                key.style.visibility = "hidden";
+                key.disabled = true;
+                key.setAttribute("aria-hidden", "true");
+                keyboardGrid.appendChild(key);
+                return;
+            }
+
+            var label = document.createElement("span");
+            label.className = "key-label";
+            label.textContent = kana;
+            key.appendChild(label);
+
+            var glyphs = registeredGlyphs[kana];
+
+            if (glyphs && glyphs.length > 0) {
+                var glyph = glyphs[glyphs.length - 1];
+
+                key.classList.add("registered");
+
+                var image = document.createElement("img");
+                image.src = glyph.dataUrl;
+                image.alt = kana + "の手書き文字";
+                key.insertBefore(image, label);                
+                key.addEventListener("click", function () {
+                    addRegisteredGlyphToCard(glyph.dataUrl, kana);
+                });
+
+            } else {
+                key.disabled = true;
+            }
+
+            keyboardGrid.appendChild(key);
+        });
+    });
 }
 function addRegisteredGlyphToCard(dataUrl,kana) {
  var image = new Image(); image.onload = function () {

@@ -131,7 +131,6 @@ button.destructive {
     display: none;
     margin-top: 18px;
     padding: 18px;
-    border: 1px solid var(--line);
     border-radius: 16px;
     background: rgba(255, 255, 255, 0.7);
 }
@@ -193,31 +192,37 @@ button.destructive {
 
 .keyboard-grid {
     display: grid;
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(17, minmax(0, 1fr));
+    gap: 4px;
+    min-width: 720px;
+}
+
+#keyboardPanel {
+    overflow-x: auto;
 }
 
 .keyboard-key {
-    min-height: 62px;
-    padding: 5px 2px;
+    min-width: 0;
+    min-height: 42px;
+    padding: 3px 1px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    background: #f8fafc;
-    color: #111827;
+    gap: 2px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background: #e5e5e5;
+    color: #222;
 }
 
 .keyboard-key .key-label {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .keyboard-key img {
-    width: 34px;
-    height: 34px;
+    width: 28px;
+    height: 28px;
     object-fit: contain;
 }
 
@@ -314,7 +319,7 @@ button.destructive {
 
 @media (max-width: 600px) {
     .keyboard-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(18, minmax(0, 1fr));
     }
 }
 
@@ -359,14 +364,6 @@ button.destructive {
 
     <div id="status" class="status">保存カードを選ぶと、範囲選択してキーボードへ登録できます。</div>
 
-    <section class="gallery">
-
-        <h2>保存したカード</h2>
-        <div id="snapshotList" class="snapshot-list">
-            <div id="snapshotEmpty" class="empty">まだ保存されていません。</div>
-        </div>
-    </section>
-
     <section id="previewPanel" class="preview-panel">
         <h2>選択したカード</h2>
         <div class="preview-shell">
@@ -381,6 +378,12 @@ button.destructive {
         </div>
     </section>
 
+    <section id="keyboardPanel" aria-label="手書き文字キーボード">
+        <h2>手書き文字キーボード</h2>
+        <p>登録済みの文字が表示されます。まだ登録されていない文字は薄く表示されます。</p>
+        <div id="keyboardGrid" class="keyboard-grid"></div>
+    </section>
+
     <div id="registerDialog" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
         <div class="register-box">
             <h2 id="registerTitle">登録する文字を選択</h2>
@@ -392,6 +395,15 @@ button.destructive {
             </div>
         </div>
     </div>
+
+    <section class="gallery">
+
+        <h2>保存したカード</h2>
+        <div id="snapshotList" class="snapshot-list">
+            <div id="snapshotEmpty" class="empty">まだ保存されていません。</div>
+        </div>
+    </section>
+    
 </main>
 
 <script>
@@ -783,34 +795,59 @@ function saveRegisteredGlyphs() {
 
 function renderHandwritingKeyboard() {
     keyboardGrid.innerHTML = "";
-    kanaKeys.forEach(function (kana) {
-        var key = document.createElement("button");
-        key.type = "button";
-        key.className = "keyboard-key";
 
-        var label = document.createElement("span");
-        label.className = "key-label";
-        label.textContent = kana;
-        key.appendChild(label);
+    // 1行につき18マス。空文字は空白として配置する
+    var keyboardRows = [
+        ["っ","ゃ","ぱ","ば","だ","ざ","が","わ","ら","や","ま","は","な","た","さ","か","あ"],
+        ["わ","","ぴ","び","ぢ","じ","ぎ","を","り","","み","ひ","に","ち","し","き","い"],
+        ["","ゆ","ぷ","ぶ","づ","ず","ぐ","ん","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
+        ["","","ぺ","べ","で","ぜ","げ","","れ","","め","へ","ね","て","せ","け","え"],
+        ["","よ","ぽ","ぼ","ど","ぞ","ご","","ろ","よ","も","ほ","の","と","そ","こ","お"]
+    ];
 
-        var glyphs = registeredGlyphs[kana];
-        if (glyphs && glyphs.length) {
-            var glyph = glyphs[glyphs.length - 1];
-            key.classList.add("registered");
+    keyboardRows.forEach(function (row) {
+        row.forEach(function (kana) {
+            var key = document.createElement("button");
+            key.type = "button";
+            key.className = "keyboard-key";
 
-            var image = document.createElement("img");
-            image.src = glyph.dataUrl;
-            image.alt = kana + "の手書き文字";
-            key.insertBefore(image, label);
+            // 空欄も1マス分の場所を確保する
+            if (kana === "") {
+                key.style.visibility = "hidden";
+                key.disabled = true;
+                key.setAttribute("aria-hidden", "true");
+                keyboardGrid.appendChild(key);
+                return;
+            }
 
-            key.addEventListener("click", function () {
-                setStatus("「" + kana + "」は登録済みです。write.htmlで利用できます。");
-            });
-        } else {
-            key.disabled = true;
-        }
+            var label = document.createElement("span");
+            label.className = "key-label";
+            label.textContent = kana;
+            key.appendChild(label);
 
-        keyboardGrid.appendChild(key);
+            var glyphs = registeredGlyphs[kana];
+
+            if (glyphs && glyphs.length > 0) {
+                var glyph = glyphs[glyphs.length - 1];
+
+                key.classList.add("registered");
+
+                var image = document.createElement("img");
+                image.src = glyph.dataUrl;
+                image.alt = kana + "の手書き文字";
+                key.insertBefore(image, label);
+
+                key.addEventListener("click", function () {
+                    setStatus(
+                        "「" + kana + "」は登録済みです。write.htmlで利用できます。"
+                    );
+                });
+            } else {
+                key.disabled = true;
+            }
+
+            keyboardGrid.appendChild(key);
+        });
     });
 }
 
