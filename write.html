@@ -1375,7 +1375,13 @@ function redrawOverlay() {
     }
 }
 
+
 function setTool(nextTool) {
+    // ペンに切り替えるとき、自由変形中のレイヤーを自動的に確定する
+    if (nextTool === "pen" && layers.length > 0) {
+        flattenLayersIntoCanvas();
+    }
+
     mode = "draw";
     drawing = false;
     selecting = false;
@@ -1383,7 +1389,7 @@ function setTool(nextTool) {
     selectionStart = null;
     clearOverlay();
     ensureOverlayPointerEvents();
-    
+
     if (nextTool === "eraser" &&
         selectedLayerIndex >= 0 &&
         layers[selectedLayerIndex]) {
