@@ -12,7 +12,7 @@
 
 :root {
     color-scheme: light;
-    --bg: #f4f1ea;
+    --bg: #ffffff;
     --panel: #ffffff;
     --ink: #1d1d1f;
     --muted: #6b7280;
@@ -24,7 +24,7 @@
 
 body {
     margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: "ヒラギノ丸ゴ Pro", serif;
     color: var(--ink);
 }
 
@@ -39,7 +39,7 @@ header {
 }
 
 header h1 {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: clamp(1.8rem, 3vw, 2.6rem);
     letter-spacing: 0.04em;
 }
@@ -57,10 +57,20 @@ header p {
     padding: 18px;
 }
 
+/* キャンパスとボタンを横並びにする */
+.canvas-layout {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+/* 描画キャンパス */
 .canvas-shell {
     position: relative;
-    width: min(100%, 960px);
-    margin: 0 auto;
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    margin: 0;
     aspect-ratio: 5 / 3;
     border: 1px solid var(--line);
     border-radius: 18px;
@@ -101,16 +111,21 @@ canvas {
 
 .controls {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-direction: column;
+    flex: 0 0 180px;
     gap: 10px;
-    margin: 16px auto 10px;
+    margin: 0;
+}
+
+/* ボタンの横幅を揃える */
+.controls button {
+    width: 100%;
 }
 
 button {
     border: 1px solid var(--line);
     border-radius: 999px;
-    padding: 11px 18px;
+    padding: 11px 10px;
     font-size: 1rem;
     line-height: 1;
     color: var(--ink);
@@ -412,23 +427,20 @@ button.destructive {
     pointer-events: none;
 }
 
-@media (max-width: 720px) {
-    main {
-        padding: 16px 12px 28px;
+@@media (max-width: 720px) {
+    .canvas-layout {
+        flex-direction: column;
     }
 
-    .stage,
-    .gallery {
-        border-radius: 16px;
-        padding: 14px;
+    .controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+        flex: none;
     }
 
-    .crop-list {
-        grid-template-columns: 1fr;
-    }
-
-    .snapshot-list {
-        grid-template-columns: 1fr;
+    .controls button {
+        width: auto;
     }
 }
 
@@ -555,17 +567,42 @@ button.destructive {
     }
 }
 
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px max(16px, calc((100vw - 1180px) / 2 + 16px));
+    background: var(--bg);
+    border-bottom: 1px solid rgba(214, 211, 204, 0.85);
+}
+
+.site-header header {
+    min-width: 0;
+    margin: 0;
+}
+
+.site-header h1 {
+    font-size: clamp(1.25rem, 2.3vw, 2rem);
+}
+
 /* ナビゲーションバー */
 .site-nav {
-  width: min(1100px, calc(100% - 28px));
-  margin: 16px auto 24px;
-  padding: 8px;
-  display: flex;
-  gap: 8px;
-  border: 1px solid #dedede;
-  border-radius: 16px;
-  background: #f7f7f7;
-  box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 400px;
+    margin: 0;
+    padding: 6px;
+    display: flex;
+    gap: 8px;
+    border: 1px solid #dedede;
+    border-radius: 16px;
+    background: #f7f7f7;
+    box-sizing: border-box;
 }
 
 .site-nav a {
@@ -619,6 +656,11 @@ button.destructive {
     display: none;
   }
 }
+
+* {
+  font-family: "ヒラギノ丸ゴ Pro", serif !important;
+}
+
 </style>
 
 </head>
@@ -626,15 +668,13 @@ button.destructive {
 
 <body>
 
-
-<main>
+<div class="site-header">
     <header>
         <h1>メッセージと文字を交換するサイト</h1>
-
     </header>
 
     <!-- ナビゲーションバー -->
-        <nav class="site-nav" aria-label="メインナビゲーション">
+    <nav class="site-nav" aria-label="メインナビゲーション">
         <a href="write.html" class="active">
             <span class="nav-icon">✎</span>
             <span>メッセージを書く</span>
@@ -644,27 +684,31 @@ button.destructive {
             <span class="nav-icon">▤</span>
             <span>みんなのメッセージ</span>
         </a>
-        </nav>
+    </nav>
+</div>
+
+<main>   
 
     <section class="stage">
-        <div class="canvas-shell" aria-label="手書き入力キャンバス">
-            <canvas id="canvas" width="900" height="540"></canvas>
-            <canvas id="selectionCanvas" width="900" height="540"></canvas>
-        </div>
+        <div class="canvas-layout">
 
-        <div class="controls">
-            <button id="pen" class="active">ペン</button>
-            <button id="eraser">消しゴム</button>
-            <button id="select">範囲指定・切り出し</button>
-            <button id="commit">確定</button>
-            <button id="apply">カードを保存</button>
-            <button id="clear" class="destructive">消去</button>
-        </div>
+            <div class="controls">
+                <button id="pen" class="active">ペン</button>
+                <button id="eraser">消しゴム</button>
+                <button id="select">範囲指定・切り出し</button>
+                <button id="commit">確定</button>
+                <button id="apply">カードを保存</button>
+                <button id="clear" class="destructive">消去</button>
+                <button type="button" id="registerKeyboard">キーボードに登録</button>
+                <button type="button" id="toggleKeyboard">キーボードを表示</button>
+            </div>
 
-        <div class="controls">
-            <button type="button" id="registerKeyboard">キーボードに登録</button>
-            <button type="button" id="toggleKeyboard">キーボードを表示</button>
-        </div>
+            <div class="canvas-shell" aria-label="手書き入力キャンバス">
+                <canvas id="canvas" width="900" height="540"></canvas>
+                <canvas id="selectionCanvas" width="900" height="540"></canvas>
+            </div>
+            
+        </div> 
 
         <section id="keyboardPanel" aria-label="手書き文字キーボード">
             <h2>手書き文字キーボード</h2>
