@@ -639,6 +639,7 @@ var cancelRegisterButton = document.getElementById("cancelRegister");
 
 var snapshots = [];
 var previewImage = null;
+var currentSnapshot = null; // 現在表示しているカード
 var previewLayers = [];
 var previewSelectedLayerIndex = -1;
 var previewSelecting = false;
@@ -718,7 +719,11 @@ function loadSnapshotsFromStorage() {
             return {
                 dataUrl: item.dataUrl,
                 width: typeof item.width === "number" ? item.width : 900,
-                height: typeof item.height === "number" ? item.height : 540
+                height: typeof item.height === "number" ? item.height : 540,
+                messageDataUrl:
+                    typeof item.messageDataUrl === "string"
+                        ? item.messageDataUrl
+                        : ""
             };
         });
 
@@ -829,8 +834,16 @@ function redrawPreviewOverlay() {
         previewSelectionCtx.restore();
     }
 }
-
 function showSnapshotPreview(snapshot) {
+
+    // 前のカードのメッセージ入力を終了して保存
+    if (currentSnapshot && currentSnapshot !== snapshot) {
+        finishMessageMode();
+    }
+
+    // 表示するカードを切り替える
+    currentSnapshot = snapshot;
+
     previewPanel.style.display = "block";
 
     var image = new Image();
@@ -882,14 +895,25 @@ function showSnapshotPreview(snapshot) {
         );
 
         // 範囲選択関連の初期化
+        // 範囲選択関連の初期化
         previewLayers = [];
         previewSelectedLayerIndex = -1;
         previewSelecting = false;
         previewSelection = null;
         previewSelectionStart = null;
-        previewMode = "select";
 
-        previewSelectionCanvas.style.pointerEvents = "auto";
+        // 初期状態はどちらの操作も無効
+        previewMode = "idle";
+        messageMode = false;
+
+        messageCanvas.style.pointerEvents = "none";
+        previewSelectionCanvas.style.pointerEvents = "none";
+
+        // メッセージを書くボタンの表示を戻す
+        toggleMessageButton.textContent = "メッセージを書く";
+
+        // 選択したカードのメッセージを復元
+        restoreMessage(snapshot);
 
         redrawPreviewOverlay();
 
@@ -921,7 +945,23 @@ function resetPreview() {
     previewSelectionCanvas.style.pointerEvents = "none";
     previewPanel.style.display = "none";
 
-    // messageCanvasは初期化しない！
+// メッセージキャンバスを初期化
+messageCtx.clearRect(
+    0,
+    0,
+    messageCanvas.width,
+    messageCanvas.height
+);
+
+messageMode = false;
+messageDrawing = false;
+messageHasContent = false;
+messageCanvas.style.pointerEvents = "none";
+
+toggleMessageButton.textContent = "メッセージを書く";
+
+// 現在のカードを解除
+currentSnapshot = null;
 }
 
 function createPreviewCrop(rect) {
@@ -1124,6 +1164,7 @@ previewSelectionCanvas.addEventListener("pointerleave", function (event) {
 
 // 範囲選択ボタン
 previewSelectButton.addEventListener("click", function () {
+    finishMessageMode();
     if (!previewImage) {
         setStatus("先に保存カードを選んでください。");
         return;
@@ -1145,6 +1186,7 @@ previewSelectButton.addEventListener("click", function () {
 
 // プレビューを閉じる
 previewClearButton.addEventListener("click", function () {
+    finishMessageMode();
     resetPreview();
     setStatus("プレビューを閉じました。");
 });
@@ -1253,6 +1295,7 @@ function renderHandwritingKeyboard() {
 
 // キーボード登録ボタン
 registerKeyboardButton.addEventListener("click", function () {
+    finishMessageMode();
     if (
         previewSelectedLayerIndex < 0 ||
         !previewLayers[previewSelectedLayerIndex]
@@ -1314,6 +1357,7 @@ confirmRegisterButton.addEventListener("click", function () {
 
 // キーボード表示切り替え
 toggleKeyboardButton.addEventListener("click", function () {
+    finishMessageMode();
     var visible = keyboardPanel.classList.toggle("visible");
 
     toggleKeyboardButton.textContent =
@@ -1324,11 +1368,95 @@ toggleKeyboardButton.addEventListener("click", function () {
     }
 });
 
+// ------------------------------
+// メッセージの保存・復元
+// ------------------------------
+
+// 現在のカードにメッセージを保存
+function saveCurrentMessage() {
+    if (!currentSnapshot) {
+        return;
+    }
+
+    currentSnapshot.messageDataUrl =
+        messageCanvas.toDataURL("image/png");
+
+    try {
+        localStorage.setItem(
+            SAVED_CARD_STORAGE_KEY,
+            JSON.stringify(snapshots)
+        );
+    } catch (error) {
+        setStatus("メッセージを保存できませんでした。");
+    }
+}
+
+
+// 選択したカードのメッセージを復元
+function restoreMessage(snapshot) {
+    messageCtx.clearRect(
+        0,
+        0,
+        messageCanvas.width,
+        messageCanvas.height
+    );
+
+    messageHasContent = false;
+
+    if (!snapshot.messageDataUrl) {
+        return;
+    }
+
+    var image = new Image();
+
+    image.onload = function () {
+        // 読み込み中に別のカードへ切り替わっていたら描画しない
+        if (currentSnapshot !== snapshot) {
+            return;
+        }
+
+        messageCtx.clearRect(
+            0,
+            0,
+            messageCanvas.width,
+            messageCanvas.height
+        );
+
+        messageCtx.drawImage(
+            image,
+            0,
+            0,
+            messageCanvas.width,
+            messageCanvas.height
+        );
+
+        messageHasContent = true;
+    };
+
+    image.src = snapshot.messageDataUrl;
+}
+
+
+// メッセージ入力を終了して保存
+function finishMessageMode() {
+    if (messageMode) {
+        messageMode = false;
+        messageDrawing = false;
+
+        messageCanvas.style.pointerEvents = "none";
+
+        toggleMessageButton.textContent = "メッセージを書く";
+
+        saveCurrentMessage();
+    }
+}
+
 
 // ------------------------------
 // メッセージ機能
 // ------------------------------
 
+// メッセージを書くモードの切り替え
 // メッセージを書くモードの切り替え
 toggleMessageButton.addEventListener("click", function () {
     if (!previewImage) {
@@ -1336,32 +1464,36 @@ toggleMessageButton.addEventListener("click", function () {
         return;
     }
 
-    messageMode = !messageMode;
+    if (messageMode) {
+        // 入力終了・自動保存
+        finishMessageMode();
+
+        setStatus("メッセージを保存しました。");
+        return;
+    }
+
+    // メッセージ入力を開始
+    messageMode = true;
+
+    messageCanvas.style.display =
+        messageVisible ? "block" : "none";
 
     messageCanvas.style.pointerEvents =
-        messageMode && messageVisible ? "auto" : "none";
+        messageVisible ? "auto" : "none";
 
-    // メッセージを書く間は範囲選択を無効にする
-    previewSelectionCanvas.style.pointerEvents =
-        messageMode
-            ? "none"
-            : (previewMode === "select" ? "auto" : "none");
+    // 範囲選択を無効にする
+    previewSelectionCanvas.style.pointerEvents = "none";
 
     toggleMessageButton.textContent =
-        messageMode
-            ? "メッセージを書くのを終了"
-            : "メッセージを書く";
+        "メッセージを書くのを終了";
 
-    setStatus(
-        messageMode
-            ? "メッセージを書けます。カードの外側にも書き込めます。"
-            : "メッセージ入力を終了しました。"
-    );
+    setStatus("メッセージを書けます。");
 });
 
 
 // メッセージの表示・非表示
 toggleMessageVisibilityButton.addEventListener("click", function () {
+    finishMessageMode();
     messageVisible = !messageVisible;
 
     messageCanvas.style.display =

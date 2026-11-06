@@ -427,7 +427,7 @@ button.destructive {
     pointer-events: none;
 }
 
-@@media (max-width: 720px) {
+@media (max-width: 720px) {
     .canvas-layout {
         flex-direction: column;
     }
@@ -524,40 +524,6 @@ button.destructive {
     color:#777; 
 }
 
-#registerDialog { 
-    display:none; 
-    position:fixed; 
-    inset:0; z-index:1000; 
-    background:#0008; 
-    align-items:center; 
-    justify-content:center; 
-    padding:16px; 
-}
-#registerDialog.visible { 
-    display:flex; 
-}
-
-.register-box { 
-    width:min(420px,100%); 
-    background:#fff; 
-    border-radius:14px; 
-    padding:22px; 
-    box-shadow:0 10px 40px #0003; 
-}
-
-.register-box select { 
-    width:100%; 
-    padding:12px; 
-    margin:12px 0; 
-    font-size:18px; 
-}
-
-.register-actions { 
-    display:flex; 
-    flex-wrap:wrap; 
-    gap:8px; 
-    justify-content:flex-end; 
-}
 
 @media(max-width:600px) { 
     .keyboard-grid { grid-template-columns:repeat(5,minmax(0,1fr)); 
@@ -695,11 +661,9 @@ button.destructive {
             <div class="controls">
                 <button id="pen" class="active">ペン</button>
                 <button id="eraser">消しゴム</button>
-                <button id="select">範囲指定・切り出し</button>
-                <button id="commit">確定</button>
+                <button id="commit">配置を確定</button>
                 <button id="apply">カードを保存</button>
                 <button id="clear" class="destructive">消去</button>
-                <button type="button" id="registerKeyboard">キーボードに登録</button>
                 <button type="button" id="toggleKeyboard">キーボードを表示</button>
             </div>
 
@@ -712,20 +676,9 @@ button.destructive {
 
         <section id="keyboardPanel" aria-label="手書き文字キーボード">
             <h2>手書き文字キーボード</h2>
-            <p>登録済みの文字を押すと、編集中のカードに追加されます。薄い文字は未登録です。</p>
+            <p>文字を押すと、編集中のカードに追加されます。追加した文字はドラッグで移動、ハンドルで拡大縮小・回転できます。</p>
             <div id="keyboardGrid" class="keyboard-grid"></div>
         </section>
-        <div id="registerDialog" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
-            <div class="register-box">
-                <h2 id="registerTitle">登録する文字を選択</h2>
-                <p>切り出した文字を、どのひらがなとして登録するか選んでください。</p>
-                <select id="registerKana" aria-label="登録するひらがな"></select>
-                <div class="register-actions">
-                    <button type="button" id="cancelRegister">キャンセル</button>
-                    <button type="button" id="confirmRegister">登録する</button>
-                </div>
-            </div>
-        </div>
 
         <div id="status" class="status">何か書いてみよう</div>
     </section>
@@ -737,7 +690,6 @@ button.destructive {
             <canvas id="previewSelectionCanvas" width="900" height="540"></canvas>
         </div>
         <div class="preview-controls">
-            <button id="previewSelect">範囲選択</button>
             <button id="previewApply">描画キャンバスへ反映</button>
             <button id="previewClear" class="destructive">プレビューを閉じる</button>
         </div>
@@ -755,7 +707,6 @@ var selectionCtx = selectionCanvas.getContext("2d");
 var status = document.getElementById("status");
 var penButton = document.getElementById("pen");
 var eraserButton = document.getElementById("eraser");
-var selectButton = document.getElementById("select");
 var commitButton = document.getElementById("commit");
 var applyButton = document.getElementById("apply");
 var clearButton = document.getElementById("clear");
@@ -765,7 +716,6 @@ var previewCanvas = document.getElementById("previewCanvas");
 var previewSelectionCanvas = document.getElementById("previewSelectionCanvas");
 var previewCtx = previewCanvas.getContext("2d");
 var previewSelectionCtx = previewSelectionCanvas.getContext("2d");
-var previewSelectButton = document.getElementById("previewSelect");
 var previewApplyButton = document.getElementById("previewApply");
 var previewClearButton = document.getElementById("previewClear");
 
@@ -798,7 +748,7 @@ function setStatus(message) {
 }
 
 function setActiveButton(activeButton) {
-    [penButton, eraserButton, selectButton].forEach(function (button) {
+    [penButton, eraserButton].forEach(function (button) {
         button.classList.toggle("active", button === activeButton);
     });
 }
@@ -971,10 +921,10 @@ function showSnapshotPreview(snapshot) {
         previewSelection = null;
         previewSelectionStart = null;
         activePreviewTransform = null;
-        previewMode = "select";
-        previewSelectionCanvas.style.pointerEvents = "auto";
+        previewMode = "idle";
+        previewSelectionCanvas.style.pointerEvents = "none";
         redrawPreviewOverlay();
-        setStatus("保存カードをプレビューに表示しました。範囲を選んで切り出し、反映先の描画キャンバスで自由変形できます。");
+        setStatus("保存カードをプレビューに表示しました。");
     };
     image.src = snapshot.dataUrl;
 }
@@ -1234,16 +1184,6 @@ previewSelectionCanvas.addEventListener("pointerleave", function (event) {
     }
 });
 
-previewSelectButton.addEventListener("click", function () {
-    if (!previewImage) {
-        setStatus("先に保存カードを選んでプレビューを開いてください。");
-        return;
-    }
-    previewMode = "select";
-    previewSelectionCanvas.style.pointerEvents = "auto";
-    redrawPreviewOverlay();
-    setStatus("プレビューで範囲指定を開始しました。切り出した後、描画キャンバスで自由変形できます。");
-});
 
 
 function cloneLayerForMainCanvas(layer) {
@@ -1280,7 +1220,6 @@ function applyPreviewLayersToCanvas() {
     selecting = false;
     currentSelection = null;
     selectionStart = null;
-    setActiveButton(selectButton);
     ensureOverlayPointerEvents();
     redrawOverlay();
     resetPreview();
@@ -1385,21 +1324,22 @@ function drawSelectionOutline(layer) {
     selectionCtx.strokeRect(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY);
     selectionCtx.restore();
 
-    var rotateHandle = transformPoint(layer, layer.width / 2, -28 / layer.scale);
-    var resizeHandle = transformPoint(layer, layer.width + 14 / layer.scale, layer.height + 14 / layer.scale);
+    var resizeHandle = transformPoint(
+    layer,
+    layer.width + 14 / layer.scale,
+    layer.height + 14 / layer.scale
+    );
 
     selectionCtx.save();
-    selectionCtx.fillStyle = "#14b8a6";
+    selectionCtx.fillStyle = "#2563eb";
     selectionCtx.strokeStyle = "#ffffff";
     selectionCtx.lineWidth = 2;
-    selectionCtx.beginPath();
-    selectionCtx.arc(rotateHandle.x, rotateHandle.y, 8, 0, Math.PI * 2);
-    selectionCtx.fill();
-    selectionCtx.stroke();
+
     selectionCtx.beginPath();
     selectionCtx.arc(resizeHandle.x, resizeHandle.y, 8, 0, Math.PI * 2);
     selectionCtx.fill();
     selectionCtx.stroke();
+
     selectionCtx.restore();
 }
 
@@ -1421,8 +1361,8 @@ function redrawOverlay() {
 
 
 function setTool(nextTool) {
-    // ペンに切り替えるとき、自由変形中のレイヤーを自動的に確定する
-    if (nextTool === "pen" && layers.length > 0) {
+    // ペン・消しゴムなど別のツールへ切り替える際は、変形中の文字を自動でCanvasへ確定する
+    if ((nextTool === "pen" || nextTool === "eraser") && layers.length > 0) {
         flattenLayersIntoCanvas();
     }
 
@@ -1434,19 +1374,11 @@ function setTool(nextTool) {
     clearOverlay();
     ensureOverlayPointerEvents();
 
-    if (nextTool === "eraser" &&
-        selectedLayerIndex >= 0 &&
-        layers[selectedLayerIndex]) {
-
-        layers.splice(selectedLayerIndex, 1);
-        selectedLayerIndex = -1;
-    }
-
     if (nextTool === "pen") {
         ctx.globalCompositeOperation = "source-over";
         ctx.lineWidth = 6;
         setActiveButton(penButton);
-        setStatus("描画モードです。文字を書いてから範囲指定してください。");
+        setStatus("描画モードです。文字を書いたり、キーボードから文字を追加したりできます。");
         return;
     }
 
@@ -1456,17 +1388,6 @@ function setTool(nextTool) {
     setStatus("消しゴムモードです。ドラッグすると線を消せます。");
 }
 
-function setSelectMode() {
-    mode = "select";
-    drawing = false;
-    selecting = false;
-    currentSelection = null;
-    selectionStart = null;
-    setActiveButton(selectButton);
-    ensureOverlayPointerEvents();
-    redrawOverlay();
-    setStatus("範囲指定モードです。ドラッグして囲んでください。");
-}
 
 function startDrawing(event) {
     if (mode !== "draw") {
@@ -1599,7 +1520,6 @@ function stopSelection(event) {
 
 function getLayerHandlePositions(layer) {
     return {
-        rotate: transformPoint(layer, layer.width / 2, -28 / layer.scale),
         resize: transformPoint(layer, layer.width + 14 / layer.scale, layer.height + 14 / layer.scale),
     };
 }
@@ -1652,10 +1572,6 @@ function startResize(layer, event) {
     startTransform(layer, event, "resize");
 }
 
-function startRotate(layer, event) {
-    startTransform(layer, event, "rotate");
-}
-
 function handleTransformMove(event) {
     if (!activeTransform || event.pointerId !== activeTransform.pointerId) {
         return;
@@ -1678,12 +1594,6 @@ function handleTransformMove(event) {
         layer.scale = Math.max(0.2, Math.min(8, activeTransform.startScale * (distance / activeTransform.startDistance)));
         redrawOverlay();
         return;
-    }
-
-    if (activeTransform.type === "rotate") {
-        var angle = Math.atan2(point.y - activeTransform.startCenterY, point.x - activeTransform.startCenterX);
-        layer.rotation = activeTransform.startRotation + ((angle - activeTransform.startAngle) * 180 / Math.PI);
-        redrawOverlay();
     }
 }
 
@@ -1730,7 +1640,7 @@ function commitSelectionLayer() {
     layers.splice(selectedLayerIndex, 1);
     selectedLayerIndex = -1;
     redrawOverlay();
-    setStatus("自由変形を確定しました。続けて範囲指定すると、また移動できます。");
+    setStatus("自由変形を確定しました。キーボードから文字を追加して配置できます。");
 }
 
 function cutSelection() {
@@ -1752,7 +1662,6 @@ function cutSelection() {
     selecting = false;
     currentSelection = null;
     selectionStart = null;
-    setActiveButton(selectButton);
     ensureOverlayPointerEvents();
     redrawOverlay();
     setStatus("切り出しました。移動や拡大縮小をしてから『確定』で固定できます。");
@@ -1861,17 +1770,6 @@ eraserButton.addEventListener("click", function () {
     setTool("eraser");
 });
 
-selectButton.addEventListener("click", function () {
-    mode = "select";
-    drawing = false;
-    selecting = false;
-    currentSelection = null;
-    selectionStart = null;
-    setActiveButton(selectButton);
-    ensureOverlayPointerEvents();
-    redrawOverlay();
-    setStatus("範囲指定モードです。ドラッグして囲んでください。");
-});
 
 commitButton.addEventListener("click", function () {
     commitSelectionLayer();
@@ -1907,13 +1805,8 @@ selectionCanvas.addEventListener("pointerdown", function (event) {
 
     if (selectedLayerIndex >= 0 && layers[selectedLayerIndex]) {
         var handles = getLayerHandlePositions(layers[selectedLayerIndex]);
-        var rotateDistance = Math.sqrt(Math.pow(point.x - handles.rotate.x, 2) + Math.pow(point.y - handles.rotate.y, 2));
         var resizeDistance = Math.sqrt(Math.pow(point.x - handles.resize.x, 2) + Math.pow(point.y - handles.resize.y, 2));
 
-        if (rotateDistance <= 14) {
-            startRotate(layers[selectedLayerIndex], event);
-            return;
-        }
 
         if (resizeDistance <= 14) {
             startResize(layers[selectedLayerIndex], event);
@@ -1930,13 +1823,8 @@ selectionCanvas.addEventListener("pointerdown", function (event) {
     if (selectedLayer) {
         redrawOverlay();
         var layerHandles = getLayerHandlePositions(selectedLayer);
-        var rotateHit = Math.sqrt(Math.pow(point.x - layerHandles.rotate.x, 2) + Math.pow(point.y - layerHandles.rotate.y, 2));
         var resizeHit = Math.sqrt(Math.pow(point.x - layerHandles.resize.x, 2) + Math.pow(point.y - layerHandles.resize.y, 2));
 
-        if (rotateHit <= 14) {
-            startRotate(selectedLayer, event);
-            return;
-        }
 
         if (resizeHit <= 14) {
             startResize(selectedLayer, event);
@@ -1947,7 +1835,7 @@ selectionCanvas.addEventListener("pointerdown", function (event) {
         return;
     }
 
-    beginSelection(event);
+    // 文字レイヤーがない場所では何もしません。範囲選択は行いません。
 });
 
 selectionCanvas.addEventListener("pointermove", function (event) {
@@ -1997,21 +1885,14 @@ ctx.fillStyle = "#ffffff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 resetPreview();
 
-// キーボード登録データはブラウザ内(localStorage)に保存します。
-var registerKeyboardButton = document.getElementById("registerKeyboard");
+// 以前登録した手書き文字を読み込み、キーボードに表示します。
 var toggleKeyboardButton = document.getElementById("toggleKeyboard");
 var keyboardPanel = document.getElementById("keyboardPanel");
 var keyboardGrid = document.getElementById("keyboardGrid");
-var registerDialog = document.getElementById("registerDialog");
-var registerKana = document.getElementById("registerKana");
-var confirmRegisterButton = document.getElementById("confirmRegister");
-var cancelRegisterButton = document.getElementById("cancelRegister");
 var kanaKeys = ["あ","い","う","え","お","か","き","く","け","こ","さ","し","す","せ","そ","た","ち","つ","て","と","な","に","ぬ","ね","の","は","ひ","ふ","へ","ほ","ま","み","む","め","も","や","ゆ","よ","ら","り","る","れ","ろ","わ","を","ん","が","ぎ","ぐ","げ","ご","ざ","じ","ず","ぜ","ぞ","だ","ぢ","づ","で","ど","ば","び","ぶ","べ","ぼ","ぱ","ぴ","ぷ","ぺ","ぽ"];
 var registeredGlyphs = {};
-var registerTargetLayer = null;
 try { registeredGlyphs = JSON.parse(localStorage.getItem("handwritingKeyboardGlyphs_v1") || "{}"); } catch (error) { registeredGlyphs = {}; }
-kanaKeys.forEach(function (kana) { var option = document.createElement("option"); option.value = kana; option.textContent = kana; registerKana.appendChild(option); });
-function saveRegisteredGlyphs() { try { localStorage.setItem("handwritingKeyboardGlyphs_v1", JSON.stringify(registeredGlyphs)); return true; } catch (error) { setStatus("登録データを保存できませんでした。文字画像が大きすぎる可能性があります。"); return false; } }
+
 function renderHandwritingKeyboard() {
     keyboardGrid.innerHTML = "";
 
@@ -2072,12 +1953,9 @@ function addRegisteredGlyphToCard(dataUrl,kana) {
   var glyphCanvas = document.createElement("canvas"); glyphCanvas.width = image.naturalWidth || image.width; glyphCanvas.height = image.naturalHeight || image.height; glyphCanvas.getContext("2d").drawImage(image,0,0);
   var scale = Math.min(105/glyphCanvas.width,105/glyphCanvas.height,1);
   layers.push({canvas:glyphCanvas,width:glyphCanvas.width,height:glyphCanvas.height,centerX:canvas.width/2,centerY:canvas.height/2,scale:scale,rotation:0});
-  selectedLayerIndex = layers.length-1; mode="select"; setActiveButton(selectButton); ensureOverlayPointerEvents(); redrawOverlay(); setStatus("「"+kana+"」の手書き文字をカードに追加しました。ドラッグで位置を調整できます。");
+  selectedLayerIndex = layers.length-1; mode="select"; ensureOverlayPointerEvents(); redrawOverlay(); setStatus("「"+kana+"」の手書き文字をカードに追加しました。ドラッグやハンドルで位置・大きさ・角度を調整できます。別のツールに切り替えると自動で確定されます。");
  }; image.src = dataUrl;
 }
-registerKeyboardButton.addEventListener("click", function () { if (selectedLayerIndex < 0 || !layers[selectedLayerIndex]) { setStatus("先に文字を切り出して選択してください。"); return; } registerTargetLayer = layers[selectedLayerIndex]; registerDialog.classList.add("visible"); });
-cancelRegisterButton.addEventListener("click", function () { registerDialog.classList.remove("visible"); registerTargetLayer=null; });
-confirmRegisterButton.addEventListener("click", function () { if (!registerTargetLayer) return; var c=document.createElement("canvas"); c.width=registerTargetLayer.canvas.width; c.height=registerTargetLayer.canvas.height; c.getContext("2d").drawImage(registerTargetLayer.canvas,0,0); var kana=registerKana.value; if(!registeredGlyphs[kana]) registeredGlyphs[kana]=[]; registeredGlyphs[kana].push({dataUrl:c.toDataURL("image/png"),savedAt:Date.now()}); if(saveRegisteredGlyphs()){renderHandwritingKeyboard();setStatus("「"+kana+"」をキーボードに登録しました。");} registerDialog.classList.remove("visible"); registerTargetLayer=null; });
 toggleKeyboardButton.addEventListener("click", function () { var visible=keyboardPanel.classList.toggle("visible"); toggleKeyboardButton.textContent=visible?"キーボードを隠す":"キーボードを表示"; if(visible) renderHandwritingKeyboard(); });
 renderHandwritingKeyboard();
 
