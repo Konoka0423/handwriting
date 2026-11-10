@@ -9,20 +9,20 @@
 <style>
 :root {
     color-scheme: light;
-    --bg: #ffffff;
+    --bg: #e5e5e5;
     --panel: #ffffff;
     --ink: #1d1d1f;
     --muted: #6b7280;
     --line: #d6d3cc;
-    --accent: #2563eb;
-    --accent-soft: #dbeafe;
-    --danger: #b91c1c;
+    --accent: #626262;
+    --accent-soft: #fbfbfb;
 }
 
 body {
     margin: 0;
     font-family: "ヒラギノ丸ゴ Pro", serif;
     color: var(--ink);
+    background: #F2F1F1;
 }
 
 main {
@@ -61,7 +61,7 @@ button {
     font-size: 1rem;
     line-height: 1;
     color: var(--ink);
-    background: var(--panel);
+    background: #ebebeb;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -69,6 +69,18 @@ button {
 button:hover {
     transform: translateY(-1px);
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+button:active {
+    color: var(--accent-soft);
+    background: var(--accent);
+    border-color: var(--accent-soft);
+}
+
+button.active {
+    color: var(--accent-soft);
+    background: var(--accent);
+    border-color: var(--accent-soft);
 }
 
 button.destructive {
@@ -107,12 +119,7 @@ button.destructive {
     min-height: 160px;
     border: 1px solid #e5e7eb;
     border-radius: 14px;
-    background:
-        linear-gradient(45deg, #f3f4f6 25%, transparent 25%) 0 0 / 14px 14px,
-        linear-gradient(-45deg, #f3f4f6 25%, transparent 25%) 0 7px / 14px 14px,
-        linear-gradient(45deg, transparent 75%, #f3f4f6 75%) 7px 0 / 14px 14px,
-        linear-gradient(-45deg, transparent 75%, #f3f4f6 75%) 7px 7px / 14px 14px,
-        #fff;
+    background: #fbfbfb;
     overflow: hidden;
 }
 
@@ -196,7 +203,7 @@ button.destructive {
     top: 23%;
     width: 81.82%;
     height: 65%;
-    background: #fff;
+    background: trasparent;
 }
 
 /* カード本体と範囲選択用キャンバス */
@@ -438,13 +445,9 @@ button.destructive {
     transition: background 0.15s ease, color 0.15s ease;
 }
 
-.site-nav a:hover {
-    background: #e9e9e9;
-}
-
 .site-nav a.active {
-    background: #252525;
-    color: #fff;
+    background: #414141;
+    color: var(--accent-soft);
 }
 
 .site-nav .nav-icon {
@@ -573,8 +576,6 @@ button.destructive {
 
 
     <section id="keyboardPanel" aria-label="手書き文字キーボード">
-        <h2>手書き文字キーボード</h2>
-        <p>登録済みの文字が表示されます。まだ登録されていない文字は薄く表示されます。</p>
         <div id="keyboardGrid" class="keyboard-grid"></div>
     </section>
 
@@ -616,6 +617,12 @@ var messageCanvas = document.getElementById("messageCanvas");
 var messageCtx = messageCanvas.getContext("2d");
 
 var toggleMessageButton = document.getElementById("toggleMessage");
+// モード切り替えボタンの青色表示を管理
+function setPreviewActiveButton(activeButton) {
+    [previewSelectButton, toggleMessageButton].forEach(function (button) {
+        button.classList.toggle("active", button === activeButton);
+    });
+}
 var toggleMessageVisibilityButton =
     document.getElementById("toggleMessageVisibility");
 
@@ -851,10 +858,8 @@ function showSnapshotPreview(snapshot) {
     image.onload = function () {
         previewImage = image;
 
-        // 外側のキャンバス全体を白くする
+       // 外側のキャンバスを透明にする
         previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-        previewCtx.fillStyle = "#ffffff";
-        previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
 
         // 内側のカードの表示範囲
         var marginX = 90;
@@ -905,6 +910,7 @@ function showSnapshotPreview(snapshot) {
         // 初期状態はどちらの操作も無効
         previewMode = "idle";
         messageMode = false;
+        setPreviewActiveButton(null);
 
         messageCanvas.style.pointerEvents = "none";
         previewSelectionCanvas.style.pointerEvents = "none";
@@ -941,6 +947,7 @@ function resetPreview() {
     previewSelection = null;
     previewSelectionStart = null;
     previewMode = "idle";
+    setPreviewActiveButton(null);
 
     previewSelectionCanvas.style.pointerEvents = "none";
     previewPanel.style.display = "none";
@@ -1175,6 +1182,7 @@ previewSelectButton.addEventListener("click", function () {
 
     previewMode = "select";
     previewSelectionCanvas.style.pointerEvents = "auto";
+    setPreviewActiveButton(previewSelectButton);
 
     toggleMessageButton.textContent = "メッセージを書く";
 
@@ -1245,24 +1253,17 @@ function renderHandwritingKeyboard() {
     keyboardRows.forEach(function (row) {
         row.forEach(function (kana) {
             var key = document.createElement("button");
-
             key.type = "button";
             key.className = "keyboard-key";
 
+            // 空欄も1マス分の場所を確保する
             if (kana === "") {
                 key.style.visibility = "hidden";
                 key.disabled = true;
                 key.setAttribute("aria-hidden", "true");
-
                 keyboardGrid.appendChild(key);
                 return;
             }
-
-            var label = document.createElement("span");
-            label.className = "key-label";
-            label.textContent = kana;
-
-            key.appendChild(label);
 
             var glyphs = registeredGlyphs[kana];
 
@@ -1275,7 +1276,7 @@ function renderHandwritingKeyboard() {
                 image.src = glyph.dataUrl;
                 image.alt = kana + "の手書き文字";
 
-                key.insertBefore(image, label);
+                key.appendChild(image);
 
                 key.addEventListener("click", function () {
                     setStatus(
@@ -1284,6 +1285,11 @@ function renderHandwritingKeyboard() {
                 });
 
             } else {
+                var label = document.createElement("span");
+                label.className = "key-label";
+                label.textContent = kana;
+
+                key.appendChild(label);
                 key.disabled = true;
             }
 
@@ -1449,6 +1455,8 @@ function finishMessageMode() {
 
         saveCurrentMessage();
     }
+
+    setPreviewActiveButton(null);
 }
 
 
@@ -1474,6 +1482,7 @@ toggleMessageButton.addEventListener("click", function () {
 
     // メッセージ入力を開始
     messageMode = true;
+    setPreviewActiveButton(toggleMessageButton);
 
     messageCanvas.style.display =
         messageVisible ? "block" : "none";

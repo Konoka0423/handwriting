@@ -12,26 +12,27 @@
 
 :root {
     color-scheme: light;
-    --bg: #ffffff;
+    --bg: #e5e5e5;
     --panel: #ffffff;
     --ink: #1d1d1f;
     --muted: #6b7280;
     --line: #d6d3cc;
-    --accent: #2563eb;
-    --accent-soft: #dbeafe;
-    --danger: #b91c1c;
+    --accent: #626262;
+    --accent-soft: #fbfbfb;
 }
 
 body {
     margin: 0;
     font-family: "ヒラギノ丸ゴ Pro", serif;
     color: var(--ink);
+    background: #F2F1F1;
 }
 
 main {
     max-width: 1180px;
     margin: 0 auto;
     padding: 24px 16px 40px;
+    background: #F2F1F1;
 }
 
 header {
@@ -53,8 +54,13 @@ header p {
 .stage,
 
 
+/* 描画キャンバスとボタンを囲むパネル */
 .stage {
-    padding: 18px;
+    padding: 24px;
+    background:
+        #fbfbfb;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
 }
 
 /* キャンパスとボタンを横並びにする */
@@ -115,6 +121,7 @@ canvas {
     flex: 0 0 180px;
     gap: 10px;
     margin: 0;
+    background: var(--accent-soft);
 }
 
 /* ボタンの横幅を揃える */
@@ -129,7 +136,7 @@ button {
     font-size: 1rem;
     line-height: 1;
     color: var(--ink);
-    background: var(--panel);
+    background: #ebebeb;
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -140,20 +147,17 @@ button:hover {
 }
 
 button:active {
-    color: var(--accent);
-    background: var(--accent-soft);
-    border-color: rgba(37, 99, 235, 0.25);
+    color: var(--accent-soft);
+    background: var(--accent);
+    border-color: var(--accent-soft);
 }
 
 button.active {
-    color: var(--accent);
-    background: var(--accent-soft);
-    border-color: rgba(37, 99, 235, 0.25);
+    color: var(--accent-soft);
+    background: var(--accent);
+    border-color: var(--accent-soft);
 }
 
-button.destructive {
-    color: var(--danger);
-}
 
 .status {
     width: min(100%, 960px);
@@ -437,6 +441,7 @@ button.destructive {
         flex-wrap: wrap;
         width: 100%;
         flex: none;
+        background: var(--accent-soft);
     }
 
     .controls button {
@@ -456,7 +461,7 @@ button.destructive {
         margin: 12px auto 10px;
         padding: 10px 8px;
         border-radius: 16px;
-        background: rgba(255, 255, 255, 0.92);
+        background: var(--accent-soft);
         backdrop-filter: blur(10px);
     }
 }
@@ -588,14 +593,11 @@ button.destructive {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.site-nav a:hover {
-  background: #e9e9e9;
-}
 
 /* 現在開いているページ */
 .site-nav a.active {
-  background: #252525;
-  color: #fff;
+  background: #414141;
+  color: var(--accent-soft);
 }
 
 .site-nav .nav-icon {
@@ -661,7 +663,6 @@ button.destructive {
             <div class="controls">
                 <button id="pen" class="active">ペン</button>
                 <button id="eraser">消しゴム</button>
-                <button id="commit">配置を確定</button>
                 <button id="apply">カードを保存</button>
                 <button id="clear" class="destructive">消去</button>
                 <button type="button" id="toggleKeyboard">キーボードを表示</button>
@@ -675,12 +676,9 @@ button.destructive {
         </div> 
 
         <section id="keyboardPanel" aria-label="手書き文字キーボード">
-            <h2>手書き文字キーボード</h2>
-            <p>文字を押すと、編集中のカードに追加されます。追加した文字はドラッグで移動、ハンドルで拡大縮小・回転できます。</p>
             <div id="keyboardGrid" class="keyboard-grid"></div>
         </section>
 
-        <div id="status" class="status">何か書いてみよう</div>
     </section>
 
     <section id="previewPanel" >
@@ -707,7 +705,6 @@ var selectionCtx = selectionCanvas.getContext("2d");
 var status = document.getElementById("status");
 var penButton = document.getElementById("pen");
 var eraserButton = document.getElementById("eraser");
-var commitButton = document.getElementById("commit");
 var applyButton = document.getElementById("apply");
 var clearButton = document.getElementById("clear");
 var snapshotList = document.getElementById("snapshotList");
@@ -1770,11 +1767,6 @@ eraserButton.addEventListener("click", function () {
     setTool("eraser");
 });
 
-
-commitButton.addEventListener("click", function () {
-    commitSelectionLayer();
-});
-
 applyButton.addEventListener("click", function () {
     flattenLayersIntoCanvas();
     var snapshot = renderCurrentCanvasSnapshot();
@@ -1896,7 +1888,6 @@ try { registeredGlyphs = JSON.parse(localStorage.getItem("handwritingKeyboardGly
 function renderHandwritingKeyboard() {
     keyboardGrid.innerHTML = "";
 
-    // 1行につき18マス。空文字は空白として配置する
     var keyboardRows = [
         ["っ","ゃ","ぱ","ば","だ","ざ","が","わ","ら","や","ま","は","な","た","さ","か","あ"],
         ["わ","","ぴ","び","ぢ","じ","ぎ","を","り","","み","ひ","に","ち","し","き","い"],
@@ -1920,11 +1911,6 @@ function renderHandwritingKeyboard() {
                 return;
             }
 
-            var label = document.createElement("span");
-            label.className = "key-label";
-            label.textContent = kana;
-            key.appendChild(label);
-
             var glyphs = registeredGlyphs[kana];
 
             if (glyphs && glyphs.length > 0) {
@@ -1935,12 +1921,21 @@ function renderHandwritingKeyboard() {
                 var image = document.createElement("img");
                 image.src = glyph.dataUrl;
                 image.alt = kana + "の手書き文字";
-                key.insertBefore(image, label);                
+
+                key.appendChild(image);
+
                 key.addEventListener("click", function () {
-                    addRegisteredGlyphToCard(glyph.dataUrl, kana);
+                    setStatus(
+                        "「" + kana + "」は登録済みです。write.htmlで利用できます。"
+                    );
                 });
 
             } else {
+                var label = document.createElement("span");
+                label.className = "key-label";
+                label.textContent = kana;
+
+                key.appendChild(label);
                 key.disabled = true;
             }
 
@@ -1948,12 +1943,18 @@ function renderHandwritingKeyboard() {
         });
     });
 }
+
 function addRegisteredGlyphToCard(dataUrl,kana) {
  var image = new Image(); image.onload = function () {
   var glyphCanvas = document.createElement("canvas"); glyphCanvas.width = image.naturalWidth || image.width; glyphCanvas.height = image.naturalHeight || image.height; glyphCanvas.getContext("2d").drawImage(image,0,0);
   var scale = Math.min(105/glyphCanvas.width,105/glyphCanvas.height,1);
   layers.push({canvas:glyphCanvas,width:glyphCanvas.width,height:glyphCanvas.height,centerX:canvas.width/2,centerY:canvas.height/2,scale:scale,rotation:0});
-  selectedLayerIndex = layers.length-1; mode="select"; ensureOverlayPointerEvents(); redrawOverlay(); setStatus("「"+kana+"」の手書き文字をカードに追加しました。ドラッグやハンドルで位置・大きさ・角度を調整できます。別のツールに切り替えると自動で確定されます。");
+  selectedLayerIndex = layers.length-1;
+  mode = "select";
+  setActiveButton(null); // キーボードから文字を追加したら、ペン・消しゴムの選択状態を解除
+  ensureOverlayPointerEvents();
+  redrawOverlay();
+  setStatus("「" + kana + "」の手書き文字をカードに追加しました。ドラッグやハンドルで位置・大きさ・角度を調整できます。");
  }; image.src = dataUrl;
 }
 toggleKeyboardButton.addEventListener("click", function () { var visible=keyboardPanel.classList.toggle("visible"); toggleKeyboardButton.textContent=visible?"キーボードを隠す":"キーボードを表示"; if(visible) renderHandwritingKeyboard(); });
