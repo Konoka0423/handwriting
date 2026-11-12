@@ -56,7 +56,7 @@ header h1 {
 
 button {
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: 20px;
     padding: 11px 18px;
     font-size: 1rem;
     line-height: 1;
@@ -81,10 +81,6 @@ button.active {
     color: var(--accent-soft);
     background: var(--accent);
     border-color: var(--accent-soft);
-}
-
-button.destructive {
-    color: var(--danger);
 }
 
 .snapshot-list {
@@ -151,23 +147,25 @@ button.destructive {
 /* 左の操作ボタンと右のキャンバスを横並びにする */
 .preview-layout {
     display: flex;
-    align-items: stretch;
-    gap: 24px;
+    align-items: center;
+    gap: 32px;
     width: 100%;
     margin: 0 auto;
 }
 
 /* 左側の操作ボタン */
 .preview-tools {
-    flex: 0 0 180px;
+    flex: 0 0 120px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
     gap: 12px;
 }
 
 .preview-tools button {
-    width: 100%;
+    width: 100px;
+    height: 80px;
     padding: 14px 8px;
 }
 
@@ -592,11 +590,19 @@ button.destructive {
     </div>
 
     <section class="gallery">
+    <div class="gallery-header">
         <h2>保存したカード</h2>
-        <div id="snapshotList" class="snapshot-list">
-            <div id="snapshotEmpty" class="empty">まだ保存されていません。</div>
+        <button type="button" id="resetAllButton" class="destructive">
+            すべてリセット
+        </button>
+    </div>
+
+    <div id="snapshotList" class="snapshot-list">
+        <div id="snapshotEmpty" class="empty">
+            まだ保存されていません。
         </div>
-    </section>
+    </div>
+</section>
 </main>
 
 <script>
@@ -1575,6 +1581,45 @@ function finishMessageDrawing(event) {
 messageCanvas.addEventListener("pointerup", finishMessageDrawing);
 messageCanvas.addEventListener("pointercancel", finishMessageDrawing);
 
+// ------------------------------
+// すべてのデータをリセット
+// ------------------------------
+
+var resetAllButton = document.getElementById("resetAllButton");
+
+resetAllButton.addEventListener("click", function () {
+
+    var confirmed = confirm(
+        "保存したカードと登録した手書き文字をすべて削除します。\nこの操作は取り消せません。よろしいですか？"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    // 保存カードを削除
+    localStorage.removeItem(SAVED_CARD_STORAGE_KEY);
+
+    // 登録した手書き文字を削除
+    localStorage.removeItem(GLYPH_STORAGE_KEY);
+
+    // JavaScript側のデータも初期化
+    snapshots = [];
+    registeredGlyphs = {};
+
+    // 画面を更新
+    resetPreview();
+    renderSnapshotList();
+    renderHandwritingKeyboard();
+
+    // キーボードを閉じる
+    keyboardPanel.classList.remove("visible");
+    toggleKeyboardButton.textContent = "キーボードを表示";
+
+    setStatus("保存したカードと登録した手書き文字をすべてリセットしました。");
+
+    alert("すべてのデータをリセットしました！");
+});
 
 // ------------------------------
 // 初期化
