@@ -189,176 +189,6 @@ button.active {
     font-size: 0.95rem;
 }
 
-.gallery {
-    margin-top: 18px;
-    padding: 18px;
-}
-
-.preview-panel {
-    display: none;
-}
-
-.preview-panel h2 {
-    margin: 0 0 14px;
-    font-size: 1.2rem;
-}
-
-.preview-shell {
-    position: relative;
-    width: min(100%, 960px);
-    margin: 0 auto;
-    aspect-ratio: 5 / 3;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    overflow: hidden;
-    background: #fff;
-}
-
-.preview-shell canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    touch-action: none;
-}
-
-.preview-controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.gallery h2 {
-    margin: 0 0 14px;
-    font-size: 1.2rem;
-}
-
-.crop-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 14px;
-}
-
-.crop-item {
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.92);
-    padding: 12px;
-}
-
-.crop-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: 0.92rem;
-}
-
-.crop-index {
-    font-weight: 700;
-}
-
-.crop-info {
-    color: var(--muted);
-    font-size: 0.8rem;
-}
-
-.preview {
-    display: grid;
-    place-items: center;
-    min-height: 120px;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    background:
-        linear-gradient(45deg, #f3f4f6 25%, transparent 25%) 0 0 / 14px 14px,
-        linear-gradient(-45deg, #f3f4f6 25%, transparent 25%) 0 7px / 14px 14px,
-        linear-gradient(45deg, transparent 75%, #f3f4f6 75%) 7px 0 / 14px 14px,
-        linear-gradient(-45deg, transparent 75%, #f3f4f6 75%) 7px 7px / 14px 14px,
-        #fff;
-    overflow: hidden;
-}
-
-.preview img {
-    display: block;
-    max-width: 100%;
-    max-height: 160px;
-    object-fit: contain;
-}
-
-.crop-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
-}
-
-.crop-actions button {
-    padding: 8px 12px;
-    font-size: 0.9rem;
-}
-
-.snapshot-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 14px;
-}
-
-.snapshot-item {
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.92);
-    padding: 12px;
-}
-
-.snapshot-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 10px;
-    font-size: 0.92rem;
-}
-
-.snapshot-title {
-    font-weight: 700;
-}
-
-.snapshot-info {
-    color: var(--muted);
-    font-size: 0.8rem;
-}
-
-.snapshot-preview {
-    display: grid;
-    place-items: center;
-    min-height: 160px;
-    border: 1px solid #e5e7eb;
-    border-radius: 14px;
-    background:
-        linear-gradient(45deg, #f3f4f6 25%, transparent 25%) 0 0 / 14px 14px,
-        linear-gradient(-45deg, #f3f4f6 25%, transparent 25%) 0 7px / 14px 14px,
-        linear-gradient(45deg, transparent 75%, #f3f4f6 75%) 7px 0 / 14px 14px,
-        linear-gradient(-45deg, transparent 75%, #f3f4f6 75%) 7px 7px / 14px 14px,
-        #fff;
-    overflow: hidden;
-}
-
-.snapshot-preview img {
-    display: block;
-    max-width: 100%;
-    max-height: 240px;
-    object-fit: contain;
-}
-
-.empty {
-    color: var(--muted);
-    text-align: center;
-    padding: 28px 0;
-}
-
 .board-item {
     position: absolute;
     left: 0;
@@ -704,22 +534,13 @@ button.active {
 
     </section>
 
+    <div id="status" class="status" role="status" aria-live="polite">描画モードです。</div>
+
     <!-- 手書き文字キーボード -->
     <div id="keyboardPanel">
         <div id="keyboardGrid" class="keyboard-grid"></div>
     </div>
 
-    <section id="previewPanel" >
-        <h2>選択したカード</h2>
-        <div class="preview-shell">
-            <canvas id="previewCanvas" width="900" height="540"></canvas>
-            <canvas id="previewSelectionCanvas" width="900" height="540"></canvas>
-        </div>
-        <div class="preview-controls">
-            <button id="previewApply">描画キャンバスへ反映</button>
-            <button id="previewClear" class="destructive">プレビューを閉じる</button>
-        </div>
-    </section>
 
 </main>
 
@@ -735,15 +556,6 @@ var penButton = document.getElementById("pen");
 var eraserButton = document.getElementById("eraser");
 var applyButton = document.getElementById("apply");
 var clearButton = document.getElementById("clear");
-var snapshotList = document.getElementById("snapshotList");
-var snapshotEmpty = document.getElementById("snapshotEmpty");
-var previewCanvas = document.getElementById("previewCanvas");
-var previewSelectionCanvas = document.getElementById("previewSelectionCanvas");
-var previewCtx = previewCanvas.getContext("2d");
-var previewSelectionCtx = previewSelectionCanvas.getContext("2d");
-var previewApplyButton = document.getElementById("previewApply");
-var previewClearButton = document.getElementById("previewClear");
-
 var mode = "draw";
 var drawing = false;
 var selecting = false;
@@ -754,14 +566,6 @@ var selectedLayerIndex = -1;
 var activeTransform = null;
 var snapshots = [];
 var SAVED_CARD_STORAGE_KEY = "sharedSavedCards_v1";
-var previewImage = null;
-var previewLayers = [];
-var previewSelectedLayerIndex = -1;
-var previewSelecting = false;
-var previewSelection = null;
-var previewSelectionStart = null;
-var activePreviewTransform = null;
-var previewMode = "idle";
 
 ctx.lineCap = "round";
 ctx.lineJoin = "round";
@@ -802,10 +606,6 @@ function clearOverlay() {
     selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
 }
 
-function updateSnapshotEmptyState() {
-    snapshotEmpty.style.display = snapshots.length === 0 ? "grid" : "none";
-}
-
 function loadSnapshotsFromStorage() {
     try {
         var raw = localStorage.getItem(SAVED_CARD_STORAGE_KEY);
@@ -841,424 +641,6 @@ function saveSnapshotsToStorage() {
         setStatus("保存カードの保存に失敗しました。ストレージ容量を確認してください。");
     }
 }
-
-function renderSnapshotList() {
-    snapshotList.innerHTML = "";
-
-    if (snapshots.length === 0) {
-        snapshotList.appendChild(snapshotEmpty);
-        updateSnapshotEmptyState();
-        return;
-    }
-
-    snapshots.forEach(function (snapshot, index) {
-        var item = document.createElement("article");
-        item.className = "snapshot-item";
-        item.title = "クリックしてプレビューに表示";
-        item.style.cursor = "pointer";
-
-        var meta = document.createElement("div");
-        meta.className = "snapshot-meta";
-
-        var title = document.createElement("div");
-        title.className = "snapshot-title";
-        title.textContent = "カード " + (index + 1);
-
-        var info = document.createElement("div");
-        info.className = "snapshot-info";
-
-        meta.appendChild(title);
-        meta.appendChild(info);
-
-        var preview = document.createElement("div");
-        preview.className = "snapshot-preview";
-
-        var img = document.createElement("img");
-        img.src = snapshot.dataUrl;
-        img.alt = "保存したカード " + (index + 1);
-
-        preview.appendChild(img);
-
-        item.appendChild(meta);
-        item.appendChild(preview);
-        item.addEventListener("click", function () {
-            showSnapshotPreview(snapshot);
-        });
-        snapshotList.appendChild(item);
-    });
-}
-
-function clearPreviewOverlay() {
-    previewSelectionCtx.clearRect(0, 0, previewSelectionCanvas.width, previewSelectionCanvas.height);
-}
-
-function drawPreviewLayer(layer) {
-    previewSelectionCtx.save();
-    previewSelectionCtx.translate(layer.centerX, layer.centerY);
-    previewSelectionCtx.rotate(layer.rotation * Math.PI / 180);
-    previewSelectionCtx.scale(layer.scale, layer.scale);
-    previewSelectionCtx.drawImage(layer.canvas, -(layer.width / 2), -(layer.height / 2));
-    previewSelectionCtx.restore();
-}
-
-function redrawPreviewOverlay() {
-    clearPreviewOverlay();
-
-    for (var index = 0; index < previewLayers.length; index += 1) {
-        drawPreviewLayer(previewLayers[index]);
-    }
-
-    if (previewMode === "select" && previewSelection) {
-        previewSelectionCtx.save();
-        previewSelectionCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
-        previewSelectionCtx.fillStyle = "rgba(37, 99, 235, 0.10)";
-        previewSelectionCtx.lineWidth = 2;
-        previewSelectionCtx.setLineDash([8, 6]);
-        previewSelectionCtx.fillRect(previewSelection.x, previewSelection.y, previewSelection.width, previewSelection.height);
-        previewSelectionCtx.strokeRect(previewSelection.x, previewSelection.y, previewSelection.width, previewSelection.height);
-        previewSelectionCtx.restore();
-    }
-}
-
-function showSnapshotPreview(snapshot) {
-    var previewPanel = document.getElementById("previewPanel");
-    if (previewPanel) {
-        previewPanel.style.display = "block";
-    }
-
-    var image = new Image();
-    image.onload = function () {
-        previewImage = image;
-        previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-        previewCtx.fillStyle = "#ffffff";
-        previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-
-        var scale = Math.min(previewCanvas.width / image.naturalWidth, previewCanvas.height / image.naturalHeight);
-        var drawWidth = image.naturalWidth * scale;
-        var drawHeight = image.naturalHeight * scale;
-        var drawX = (previewCanvas.width - drawWidth) / 2;
-        var drawY = (previewCanvas.height - drawHeight) / 2;
-
-        previewCtx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
-        previewLayers = [];
-        previewSelectedLayerIndex = -1;
-        previewSelecting = false;
-        previewSelection = null;
-        previewSelectionStart = null;
-        activePreviewTransform = null;
-        previewMode = "idle";
-        previewSelectionCanvas.style.pointerEvents = "none";
-        redrawPreviewOverlay();
-        setStatus("保存カードをプレビューに表示しました。");
-    };
-    image.src = snapshot.dataUrl;
-}
-
-function resetPreview() {
-    previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-    previewCtx.fillStyle = "#ffffff";
-    previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-    previewSelectionCtx.clearRect(0, 0, previewSelectionCanvas.width, previewSelectionCanvas.height);
-    previewImage = null;
-    previewLayers = [];
-    previewSelectedLayerIndex = -1;
-    previewSelecting = false;
-    previewSelection = null;
-    previewSelectionStart = null;
-    activePreviewTransform = null;
-    previewMode = "idle";
-    previewSelectionCanvas.style.pointerEvents = "none";
-    var previewPanel = document.getElementById("previewPanel");
-    if (previewPanel) {
-        previewPanel.style.display = "none";
-    }
-}
-
-function createPreviewCrop(rect) {
-    if (!previewImage) {
-        return null;
-    }
-
-    var left = Math.max(0, Math.floor(rect.x));
-    var top = Math.max(0, Math.floor(rect.y));
-    var width = Math.min(previewCanvas.width - left, Math.ceil(rect.width));
-    var height = Math.min(previewCanvas.height - top, Math.ceil(rect.height));
-
-    if (width <= 0 || height <= 0) {
-        return null;
-    }
-
-    var cropCanvas = document.createElement("canvas");
-    cropCanvas.width = width;
-    cropCanvas.height = height;
-
-    var cropCtx = cropCanvas.getContext("2d");
-    var sourceImageData = previewCtx.getImageData(left, top, width, height);
-    var pixels = sourceImageData.data;
-
-    for (var index = 0; index < pixels.length; index += 4) {
-        var r = pixels[index];
-        var g = pixels[index + 1];
-        var b = pixels[index + 2];
-        if (r > 250 && g > 250 && b > 250) {
-            pixels[index + 3] = 0;
-        }
-    }
-
-    cropCtx.putImageData(sourceImageData, 0, 0);
-
-    return {
-        canvas: cropCanvas,
-        width: width,
-        height: height,
-        centerX: left + (width / 2),
-        centerY: top + (height / 2),
-        scale: 1,
-        rotation: 0,
-    };
-}
-
-function previewSelectLayerAtPoint(point) {
-    for (var index = previewLayers.length - 1; index >= 0; index -= 1) {
-        var layer = previewLayers[index];
-        var box = getLayerCorners(layer);
-        if (point.x >= box.minX && point.x <= box.maxX && point.y >= box.minY && point.y <= box.maxY) {
-            var layerItem = previewLayers.splice(index, 1)[0];
-            previewLayers.push(layerItem);
-            previewSelectedLayerIndex = previewLayers.length - 1;
-            return previewLayers[previewSelectedLayerIndex];
-        }
-    }
-    return null;
-}
-
-function startPreviewTransform(layer, event, type) {
-    var point = getCanvasPoint(event, previewSelectionCanvas);
-    activePreviewTransform = {
-        type: type,
-        layer: layer,
-        pointerId: event.pointerId,
-        startCenterX: layer.centerX,
-        startCenterY: layer.centerY,
-        startScale: layer.scale,
-        startRotation: layer.rotation,
-        startPointerX: point.x,
-        startPointerY: point.y,
-        startDistance: Math.max(24, Math.sqrt(Math.pow(point.x - layer.centerX, 2) + Math.pow(point.y - layer.centerY, 2))),
-        startAngle: Math.atan2(point.y - layer.centerY, point.x - layer.centerX),
-    };
-    previewSelectionCanvas.setPointerCapture(event.pointerId);
-    event.preventDefault();
-}
-
-function handlePreviewTransformMove(event) {
-    if (!activePreviewTransform || event.pointerId !== activePreviewTransform.pointerId) {
-        return;
-    }
-
-    var point = getCanvasPoint(event, previewSelectionCanvas);
-    var layer = activePreviewTransform.layer;
-
-    if (activePreviewTransform.type === "move") {
-        layer.centerX = activePreviewTransform.startCenterX + (point.x - activePreviewTransform.startPointerX);
-        layer.centerY = activePreviewTransform.startCenterY + (point.y - activePreviewTransform.startPointerY);
-        redrawPreviewOverlay();
-        return;
-    }
-
-    if (activePreviewTransform.type === "resize") {
-        var dx = point.x - activePreviewTransform.startCenterX;
-        var dy = point.y - activePreviewTransform.startCenterY;
-        var distance = Math.max(24, Math.sqrt(dx * dx + dy * dy));
-        layer.scale = Math.max(0.2, Math.min(8, activePreviewTransform.startScale * (distance / activePreviewTransform.startDistance)));
-        redrawPreviewOverlay();
-        return;
-    }
-
-    if (activePreviewTransform.type === "rotate") {
-        var angle = Math.atan2(point.y - activePreviewTransform.startCenterY, point.x - activePreviewTransform.startCenterX);
-        layer.rotation = activePreviewTransform.startRotation + ((angle - activePreviewTransform.startAngle) * 180 / Math.PI);
-        redrawPreviewOverlay();
-    }
-}
-
-function endPreviewTransform(event) {
-    if (!activePreviewTransform || event.pointerId !== activePreviewTransform.pointerId) {
-        return;
-    }
-
-    activePreviewTransform = null;
-    if (previewSelectionCanvas.hasPointerCapture(event.pointerId)) {
-        previewSelectionCanvas.releasePointerCapture(event.pointerId);
-    }
-}
-
-function beginPreviewSelection(event) {
-    previewSelecting = true;
-    previewSelectionCanvas.setPointerCapture(event.pointerId);
-
-    var point = getCanvasPoint(event, previewSelectionCanvas);
-    previewSelectionStart = point;
-    previewSelection = {
-        x: point.x,
-        y: point.y,
-        width: 0,
-        height: 0,
-    };
-    redrawPreviewOverlay();
-}
-
-function continuePreviewSelection(event) {
-    if (!previewSelecting) {
-        return;
-    }
-
-    previewSelection = normalizeRect(previewSelectionStart, getCanvasPoint(event, previewSelectionCanvas));
-    redrawPreviewOverlay();
-}
-
-function cutPreviewSelection() {
-    if (!previewSelection || previewSelection.width < 2 || previewSelection.height < 2) {
-        setStatus("範囲が小さすぎます。もう一度選んでください。");
-        return;
-    }
-
-    var crop = createPreviewCrop(previewSelection);
-    if (!crop) {
-        setStatus("選択した範囲から切り出せませんでした。");
-        return;
-    }
-
-    previewLayers.push(crop);
-    previewSelectedLayerIndex = previewLayers.length - 1;
-    previewSelecting = false;
-    previewSelection = {
-        x: previewSelection.x,
-        y: previewSelection.y,
-        width: previewSelection.width,
-        height: previewSelection.height,
-    };
-    previewSelectionStart = null;
-    previewMode = "select";
-    previewSelectionCanvas.style.pointerEvents = "auto";
-    redrawPreviewOverlay();
-    setStatus("プレビュー内の範囲を切り出しました。反映先の描画キャンバスで自由変形できます。");
-}
-
-function stopPreviewSelection(event) {
-    if (!previewSelecting) {
-        return;
-    }
-
-    previewSelecting = false;
-
-    if (previewSelectionCanvas.hasPointerCapture(event.pointerId)) {
-        previewSelectionCanvas.releasePointerCapture(event.pointerId);
-    }
-
-    if (previewSelection && (previewSelection.width < 2 || previewSelection.height < 2)) {
-        previewSelection = null;
-        redrawPreviewOverlay();
-        setStatus("範囲が小さすぎます。もう一度、少し広めに選んでください。");
-        return;
-    }
-
-    if (previewSelection) {
-        cutPreviewSelection();
-    }
-}
-
-previewSelectionCanvas.addEventListener("pointerdown", function (event) {
-    if (previewMode !== "select") {
-        return;
-    }
-
-    var point = getCanvasPoint(event, previewSelectionCanvas);
-    previewSelection = null;
-    previewSelectionStart = point;
-    previewSelection = {
-        x: point.x,
-        y: point.y,
-        width: 0,
-        height: 0,
-    };
-    beginPreviewSelection(event);
-});
-
-previewSelectionCanvas.addEventListener("pointermove", function (event) {
-    if (previewSelecting) {
-        continuePreviewSelection(event);
-    }
-});
-
-previewSelectionCanvas.addEventListener("pointerup", function (event) {
-    if (previewSelecting) {
-        stopPreviewSelection(event);
-    }
-});
-
-previewSelectionCanvas.addEventListener("pointercancel", function (event) {
-    if (previewSelecting) {
-        stopPreviewSelection(event);
-    }
-});
-
-previewSelectionCanvas.addEventListener("pointerleave", function (event) {
-    if (previewSelecting) {
-        stopPreviewSelection(event);
-    }
-});
-
-
-
-function cloneLayerForMainCanvas(layer) {
-    var clonedCanvas = document.createElement("canvas");
-    clonedCanvas.width = layer.width;
-    clonedCanvas.height = layer.height;
-
-    var clonedCtx = clonedCanvas.getContext("2d");
-    clonedCtx.clearRect(0, 0, clonedCanvas.width, clonedCanvas.height);
-    clonedCtx.drawImage(layer.canvas, 0, 0);
-
-    return {
-        canvas: clonedCanvas,
-        width: layer.width,
-        height: layer.height,
-        centerX: layer.centerX,
-        centerY: layer.centerY,
-        scale: layer.scale,
-        rotation: layer.rotation,
-    };
-}
-
-function applyPreviewLayersToCanvas() {
-    if (!previewImage || previewLayers.length === 0) {
-        setStatus("プレビューで反映する要素がありません。");
-        return;
-    }
-
-    var nextLayers = previewLayers.map(cloneLayerForMainCanvas);
-    layers = layers.concat(nextLayers);
-    selectedLayerIndex = layers.length - 1;
-    mode = "select";
-    drawing = false;
-    selecting = false;
-    currentSelection = null;
-    selectionStart = null;
-    ensureOverlayPointerEvents();
-    redrawOverlay();
-    resetPreview();
-    setStatus("プレビューの内容を描画キャンバスへ反映しました。ドラッグして位置を調整できます。");
-}
-
-previewApplyButton.addEventListener("click", function () {
-    applyPreviewLayersToCanvas();
-});
-
-previewClearButton.addEventListener("click", function () {
-    resetPreview();
-    setStatus("プレビューを閉じました。保存カード一覧から選べます。");
-});
 
 function ensureOverlayPointerEvents() {
     selectionCanvas.style.pointerEvents = mode === "select" ? "auto" : "none";
@@ -1800,7 +1182,6 @@ applyButton.addEventListener("click", function () {
     var snapshot = renderCurrentCanvasSnapshot();
     snapshots.unshift(snapshot);
     saveSnapshotsToStorage();
-    renderSnapshotList();
     resetWorkingCanvas();
     setStatus("現在のキャンバスを保存して、新しいキャンバスを開始しました。");
 });
@@ -1903,7 +1284,6 @@ window.addEventListener("resize", function () {
 
 ctx.fillStyle = "#ffffff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
-resetPreview();
 
 // 以前登録した手書き文字を読み込み、キーボードに表示します。
 var toggleKeyboardButton = document.getElementById("toggleKeyboard");
@@ -1918,10 +1298,10 @@ function renderHandwritingKeyboard() {
 
     var keyboardRows = [
         ["っ","ゃ","ぱ","ば","だ","ざ","が","わ","ら","や","ま","は","な","た","さ","か","あ"],
-        ["わ","","ぴ","び","ぢ","じ","ぎ","を","り","","み","ひ","に","ち","し","き","い"],
-        ["","ゆ","ぷ","ぶ","づ","ず","ぐ","ん","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
+        ["","","ぴ","び","ぢ","じ","ぎ","","り","","み","ひ","に","ち","し","き","い"],
+        ["","ゅ","ぷ","ぶ","づ","ず","ぐ","を","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
         ["","","ぺ","べ","で","ぜ","げ","","れ","","め","へ","ね","て","せ","け","え"],
-        ["","よ","ぽ","ぼ","ど","ぞ","ご","","ろ","よ","も","ほ","の","と","そ","こ","お"]
+        ["","ょ","ぽ","ぼ","ど","ぞ","ご","ん","ろ","よ","も","ほ","の","と","そ","こ","お"]
     ];
 
     keyboardRows.forEach(function (row) {
@@ -1990,7 +1370,6 @@ setTool("pen");
 ensureOverlayPointerEvents();
 redrawOverlay();
 loadSnapshotsFromStorage();
-renderSnapshotList();
 
 </script>
 

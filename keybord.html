@@ -167,6 +167,22 @@ button.active {
     width: 100px;
     height: 80px;
     padding: 14px 8px;
+    border-radius: 5px;
+}
+
+.preview-line-tools {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.preview-line-tools button {
+    width: 100px;
+    height: 48px;
+    padding: 8px 5px;
+    border-radius: 5px;
 }
 
 /* 右側のキャンバス領域 */
@@ -212,6 +228,26 @@ button.active {
     height: 100%;
     display: block;
     touch-action: none;
+}
+
+/* 範囲選択・部分消去用キャンバスを最前面に配置 */
+#previewSelectionCanvas {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    touch-action: none;
+}
+
+/* 青い範囲選択枠専用。消去操作で消えない独立レイヤー */
+#previewOutlineCanvas {
+    position: absolute;
+    inset: 0;
+    z-index: 21;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
 }
 
 /* メッセージ用キャンバス */
@@ -541,6 +577,10 @@ button.active {
             <!-- 左側の操作ボタン -->
             <div class="preview-tools">
                 <button id="previewSelect">範囲選択</button>
+                <div id="previewLineTools" class="preview-line-tools" style="display:none;">
+                    <button type="button" id="previewErase">線を消す</button>
+                    <button type="button" id="previewAdd">線を追加</button>
+                </div>
                 <button type="button" id="registerKeyboard">キーボードに登録</button>
                 <button type="button" id="toggleKeyboard">キーボードを表示</button>
                 <button type="button" id="toggleMessage">メッセージを書く</button>
@@ -552,6 +592,7 @@ button.active {
                 <div class="card-area">
                     <canvas id="previewCanvas" width="900" height="540"></canvas>
                     <canvas id="previewSelectionCanvas" width="900" height="540"></canvas>
+                    <canvas id="previewOutlineCanvas" width="900" height="540"></canvas>
                 </div>
 
                 <canvas id="messageCanvas" width="1100" height="700"></canvas>
@@ -618,6 +659,8 @@ var previewCanvas = document.getElementById("previewCanvas");
 var previewSelectionCanvas = document.getElementById("previewSelectionCanvas");
 var previewCtx = previewCanvas.getContext("2d");
 var previewSelectionCtx = previewSelectionCanvas.getContext("2d");
+var previewOutlineCanvas = document.getElementById("previewOutlineCanvas");
+var previewOutlineCtx = previewOutlineCanvas.getContext("2d");
 
 var messageCanvas = document.getElementById("messageCanvas");
 var messageCtx = messageCanvas.getContext("2d");
@@ -625,7 +668,7 @@ var messageCtx = messageCanvas.getContext("2d");
 var toggleMessageButton = document.getElementById("toggleMessage");
 // モード切り替えボタンの青色表示を管理
 function setPreviewActiveButton(activeButton) {
-    [previewSelectButton, toggleMessageButton].forEach(function (button) {
+    [previewSelectButton, previewEraseButton, previewAddButton, toggleMessageButton].forEach(function (button) {
         button.classList.toggle("active", button === activeButton);
     });
 }
@@ -638,6 +681,9 @@ var messageHasContent = false;
 var messageMode = false;
 
 var previewSelectButton = document.getElementById("previewSelect");
+var previewEraseButton = document.getElementById("previewErase");
+var previewAddButton = document.getElementById("previewAdd");
+var previewLineTools = document.getElementById("previewLineTools");
 var previewClearButton = document.getElementById("previewClear");
 var registerKeyboardButton = document.getElementById("registerKeyboard");
 var toggleKeyboardButton = document.getElementById("toggleKeyboard");
@@ -659,6 +705,12 @@ var previewSelecting = false;
 var previewSelection = null;
 var previewSelectionStart = null;
 var previewMode = "idle";
+var previewErasing = false;
+var previewEraseLastPoint = null;
+var previewPaintMode = null;
+var previewPaintStartPoint = null;
+var previewPaintMoved = false;
+var PREVIEW_ERASER_SIZE = 5;
 
 var kanaKeys = [
     "あ", "い", "う", "え", "お",
@@ -818,33 +870,118 @@ function drawPreviewLayer(layer) {
 function redrawPreviewOverlay() {
     clearPreviewOverlay();
 
+    // 切り出した文字画像を描画する
     for (var index = 0; index < previewLayers.length; index += 1) {
         drawPreviewLayer(previewLayers[index]);
     }
 
-    if (previewMode === "select" && previewSelection) {
-        previewSelectionCtx.save();
+    // 青い範囲選択枠は専用キャンバスに描画する
+    previewOutlineCtx.clearRect(
+        0,
+        0,
+        previewOutlineCanvas.width,
+        previewOutlineCanvas.height
+    );
 
-        previewSelectionCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
-        previewSelectionCtx.fillStyle = "rgba(37, 99, 235, 0.10)";
-        previewSelectionCtx.lineWidth = 2;
-        previewSelectionCtx.setLineDash([8, 6]);
+    if (
+        (previewMode === "select" || previewMode === "erase" || previewMode === "add") &&
+        previewSelection
+    ) {
+        previewOutlineCtx.save();
+        previewOutlineCtx.strokeStyle = "rgba(37, 99, 235, 0.95)";
+        previewOutlineCtx.fillStyle = "rgba(37, 99, 235, 0.10)";
+        previewOutlineCtx.lineWidth = 2;
+        previewOutlineCtx.setLineDash([8, 6]);
 
-        previewSelectionCtx.fillRect(
+        previewOutlineCtx.fillRect(
             previewSelection.x,
             previewSelection.y,
             previewSelection.width,
             previewSelection.height
         );
-
-        previewSelectionCtx.strokeRect(
+        previewOutlineCtx.strokeRect(
             previewSelection.x,
             previewSelection.y,
             previewSelection.width,
             previewSelection.height
         );
+        previewOutlineCtx.restore();
 
-        previewSelectionCtx.restore();
+        // 切り出した文字の「実際に描画されている部分」を赤い輪郭で表示
+        // 部分消去すると元画像の透明部分が増えるため、赤枠もその場で消える
+        var activeLayer = previewLayers[previewSelectedLayerIndex];
+
+        if (activeLayer && activeLayer.canvas) {
+            var layerCanvas = activeLayer.canvas;
+            var layerCtx = layerCanvas.getContext("2d");
+            var layerWidth = layerCanvas.width;
+            var layerHeight = layerCanvas.height;
+            var sourcePixels = layerCtx.getImageData(
+                0, 0, layerWidth, layerHeight
+            );
+            var sourceData = sourcePixels.data;
+            var outlinePixels = previewOutlineCtx.createImageData(
+                layerWidth, layerHeight
+            );
+            var outlineData = outlinePixels.data;
+
+            // 周囲8方向のどこかが透明なら、描画部分の輪郭とみなす
+            for (var py = 0; py < layerHeight; py += 1) {
+                for (var px = 0; px < layerWidth; px += 1) {
+                    var pixelIndex = (py * layerWidth + px) * 4;
+                    var alpha = sourceData[pixelIndex + 3];
+
+                    if (alpha < 20) continue;
+
+                    var isEdge = false;
+
+                    for (var oy = -1; oy <= 1 && !isEdge; oy += 1) {
+                        for (var ox = -1; ox <= 1; ox += 1) {
+                            if (ox === 0 && oy === 0) continue;
+
+                            var nx = px + ox;
+                            var ny = py + oy;
+
+                            if (
+                                nx < 0 || ny < 0 ||
+                                nx >= layerWidth || ny >= layerHeight
+                            ) {
+                                isEdge = true;
+                                break;
+                            }
+
+                            var neighborAlpha =
+                                sourceData[(ny * layerWidth + nx) * 4 + 3];
+
+                            if (neighborAlpha < 20) {
+                                isEdge = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isEdge) {
+                        outlineData[pixelIndex] = 235;     // 赤
+                        outlineData[pixelIndex + 1] = 45;
+                        outlineData[pixelIndex + 2] = 45;
+                        outlineData[pixelIndex + 3] = 230;
+                    }
+                }
+            }
+
+            var outlineTempCanvas = document.createElement("canvas");
+            outlineTempCanvas.width = layerWidth;
+            outlineTempCanvas.height = layerHeight;
+            outlineTempCanvas.getContext("2d").putImageData(
+                outlinePixels, 0, 0
+            );
+
+            previewOutlineCtx.drawImage(
+                outlineTempCanvas,
+                activeLayer.x,
+                activeLayer.y
+            );
+        }
     }
 }
 function showSnapshotPreview(snapshot) {
@@ -945,6 +1082,11 @@ function resetPreview() {
         previewSelectionCanvas.width,
         previewSelectionCanvas.height
     );
+    previewOutlineCtx.clearRect(
+        0, 0,
+        previewOutlineCanvas.width,
+        previewOutlineCanvas.height
+    );
 
     previewImage = null;
     previewLayers = [];
@@ -953,6 +1095,9 @@ function resetPreview() {
     previewSelection = null;
     previewSelectionStart = null;
     previewMode = "idle";
+    if (previewLineTools) previewLineTools.style.display = "none";
+    previewErasing = false;
+    previewEraseLastPoint = null;
     setPreviewActiveButton(null);
 
     previewSelectionCanvas.style.pointerEvents = "none";
@@ -1141,39 +1286,397 @@ function stopPreviewSelection(event) {
 }
 
 
-// 範囲選択用キャンバスのイベント
-previewSelectionCanvas.addEventListener("pointerdown", function (event) {
-    if (previewMode !== "select" || messageMode) {
+// 選択した文字の一部を消す処理（元の保存カードには影響しない）
+function getSelectedLayerPoint(point, layer) {
+    return {
+        x: point.x - layer.x,
+        y: point.y - layer.y
+    };
+}
+
+function applyPreviewPaintSegment(layer, from, to, mode) {
+    var ctx = layer.canvas.getContext("2d");
+    ctx.save();
+    ctx.lineWidth = PREVIEW_ERASER_SIZE;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    if (mode === "erase") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+    } else {
+        // 「線を追加」：ブラシの形のマスクを作り、その範囲にある
+        // 元カードの黒い筆跡だけを選択レイヤーへ戻す。
+        // clip() は開いた線のパスでは面積がほぼゼロになるため、
+        // 別キャンバスに太いストロークを描いてマスクとして使う。
+        var brushMask = document.createElement("canvas");
+        brushMask.width = layer.canvas.width;
+        brushMask.height = layer.canvas.height;
+        var maskCtx = brushMask.getContext("2d");
+
+        maskCtx.strokeStyle = "#ffffff";
+        maskCtx.lineWidth = PREVIEW_ERASER_SIZE;
+        maskCtx.lineCap = "round";
+        maskCtx.lineJoin = "round";
+        maskCtx.beginPath();
+        maskCtx.moveTo(from.x, from.y);
+        maskCtx.lineTo(to.x, to.y);
+        maskCtx.stroke();
+
+        // 元カードの該当部分を切り出し、白い背景を透明にする。
+        // これにより背景の白い四角ではなく、筆跡だけを追加できる。
+        var sourceCanvas = document.createElement("canvas");
+        sourceCanvas.width = layer.canvas.width;
+        sourceCanvas.height = layer.canvas.height;
+        var sourceCtx = sourceCanvas.getContext("2d");
+        sourceCtx.drawImage(
+            previewCanvas,
+            layer.x, layer.y, layer.canvas.width, layer.canvas.height,
+            0, 0, layer.canvas.width, layer.canvas.height
+        );
+
+        var sourceImage = sourceCtx.getImageData(
+            0, 0, sourceCanvas.width, sourceCanvas.height
+        );
+        var sourceData = sourceImage.data;
+        for (var i = 0; i < sourceData.length; i += 4) {
+            // 選択時と同じ白背景判定を使い、白い部分は追加しない
+            if (sourceData[i] > 250 && sourceData[i + 1] > 250 && sourceData[i + 2] > 250) {
+                sourceData[i + 3] = 0;
+            }
+        }
+        sourceCtx.putImageData(sourceImage, 0, 0);
+
+        // 筆跡画像をブラシマスクの範囲に限定する
+        sourceCtx.globalCompositeOperation = "destination-in";
+        sourceCtx.drawImage(brushMask, 0, 0);
+        sourceCtx.globalCompositeOperation = "source-over";
+
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(sourceCanvas, 0, 0);
+    }
+    ctx.restore();
+}
+
+function expandPreviewLayerForAdd(layer) {
+    // 選択範囲の外にある筆跡も追加できるよう、レイヤーをプレビュー全体の大きさに広げる。
+    // 既存の切り抜き内容は元の位置に保持する。
+    if (
+        layer.canvas.width === previewCanvas.width &&
+        layer.canvas.height === previewCanvas.height &&
+        layer.x === 0 &&
+        layer.y === 0
+    ) {
         return;
     }
 
-    beginPreviewSelection(event);
+    var expandedCanvas = document.createElement("canvas");
+    expandedCanvas.width = previewCanvas.width;
+    expandedCanvas.height = previewCanvas.height;
+    var expandedCtx = expandedCanvas.getContext("2d");
+    expandedCtx.drawImage(layer.canvas, layer.x, layer.y);
+
+    layer.canvas = expandedCanvas;
+    layer.width = expandedCanvas.width;
+    layer.height = expandedCanvas.height;
+    layer.x = 0;
+    layer.y = 0;
+}
+
+// 元のカード上でタップした筆跡とつながっている部分を、選択レイヤーへ追加する
+function addConnectedStroke(layer, point) {
+    var sourceCanvas = previewCanvas;
+    var sourceCtx = sourceCanvas.getContext("2d");
+    var width = sourceCanvas.width;
+    var height = sourceCanvas.height;
+    var sourceImage = sourceCtx.getImageData(0, 0, width, height);
+    var sourceData = sourceImage.data;
+
+    function isInk(index) {
+        var r = sourceData[index];
+        var g = sourceData[index + 1];
+        var b = sourceData[index + 2];
+        var a = sourceData[index + 3];
+        // 白い背景を除き、アンチエイリアスを含む濃い筆跡を対象にする
+        var luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        return a > 10 && luminance < 245;
+    }
+
+    var startX = Math.round(point.x);
+    var startY = Math.round(point.y);
+    var startIndex = -1;
+    var searchRadius = 9;
+
+    // タップ位置の近くにある筆跡画素を探す
+    for (var radius = 0; radius <= searchRadius && startIndex < 0; radius++) {
+        for (var dy = -radius; dy <= radius && startIndex < 0; dy++) {
+            for (var dx = -radius; dx <= radius; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+                var sx = startX + dx;
+                var sy = startY + dy;
+                if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+                var candidate = (sy * width + sx) * 4;
+                if (isInk(candidate)) {
+                    startIndex = sy * width + sx;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (startIndex < 0) {
+        setStatus("追加したい筆跡の近くをタップしてください。");
+        return false;
+    }
+
+    // 8方向につながっている筆跡を探索
+    var visited = new Uint8Array(width * height);
+    var queue = [startIndex];
+    visited[startIndex] = 1;
+    var head = 0;
+
+    while (head < queue.length) {
+        var current = queue[head++];
+        var x = current % width;
+        var y = Math.floor(current / width);
+
+        for (var oy = -1; oy <= 1; oy++) {
+            for (var ox = -1; ox <= 1; ox++) {
+                if (ox === 0 && oy === 0) continue;
+                var nx = x + ox;
+                var ny = y + oy;
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                var next = ny * width + nx;
+                if (visited[next]) continue;
+                if (isInk(next * 4)) {
+                    visited[next] = 1;
+                    queue.push(next);
+                }
+            }
+        }
+    }
+
+    // 元カードの画素をそのまま選択レイヤーへ追加する
+    var targetCtx = layer.canvas.getContext("2d");
+    var targetImage = targetCtx.getImageData(0, 0, width, height);
+    var targetData = targetImage.data;
+    for (var i = 0; i < queue.length; i++) {
+        var pixel = queue[i] * 4;
+        targetData[pixel] = sourceData[pixel];
+        targetData[pixel + 1] = sourceData[pixel + 1];
+        targetData[pixel + 2] = sourceData[pixel + 2];
+        targetData[pixel + 3] = sourceData[pixel + 3];
+    }
+    targetCtx.putImageData(targetImage, 0, 0);
+    setStatus("タップした筆跡のつながった部分を追加しました。");
+    return true;
+}
+
+// タップした筆跡とつながっている部分を、ひとかたまりとして消す
+function eraseConnectedStroke(layer, point) {
+    var canvas = layer.canvas;
+    var ctx = canvas.getContext("2d");
+    var width = canvas.width;
+    var height = canvas.height;
+    var image = ctx.getImageData(0, 0, width, height);
+    var data = image.data;
+
+    var startX = Math.round(point.x);
+    var startY = Math.round(point.y);
+    var startIndex = -1;
+
+    // 赤い輪郭の上をタップした場合も拾えるよう、近傍から筆跡画素を探す
+    var searchRadius = 7;
+    for (var radius = 0; radius <= searchRadius && startIndex < 0; radius++) {
+        for (var dy = -radius; dy <= radius && startIndex < 0; dy++) {
+            for (var dx = -radius; dx <= radius; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+                var sx = startX + dx;
+                var sy = startY + dy;
+                if (sx < 0 || sy < 0 || sx >= width || sy >= height) continue;
+                var candidate = (sy * width + sx) * 4;
+                if (data[candidate + 3] > 20) {
+                    startIndex = sy * width + sx;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (startIndex < 0) {
+        setStatus("筆跡の赤枠付近をタップしてください。");
+        return false;
+    }
+
+    // 8方向でつながっている画素を探索し、その領域だけ透明にする
+    var visited = new Uint8Array(width * height);
+    var queue = [startIndex];
+    visited[startIndex] = 1;
+    var head = 0;
+
+    while (head < queue.length) {
+        var current = queue[head++];
+        var x = current % width;
+        var y = Math.floor(current / width);
+        var pixel = current * 4;
+        data[pixel + 3] = 0;
+
+        for (var oy = -1; oy <= 1; oy++) {
+            for (var ox = -1; ox <= 1; ox++) {
+                if (ox === 0 && oy === 0) continue;
+                var nx = x + ox;
+                var ny = y + oy;
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                var next = ny * width + nx;
+                if (visited[next]) continue;
+                if (data[next * 4 + 3] > 20) {
+                    visited[next] = 1;
+                    queue.push(next);
+                }
+            }
+        }
+    }
+
+    ctx.putImageData(image, 0, 0);
+    setStatus("タップした筆跡のつながった部分を消しました。");
+    return true;
+}
+
+function beginPreviewPaint(event, mode) {
+    var layer = previewLayers[previewSelectedLayerIndex];
+    if (!layer) {
+        setStatus("先に範囲選択をしてください。");
+        return;
+    }
+
+    if (mode === "add") {
+        expandPreviewLayerForAdd(layer);
+    }
+
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    var localPoint = getSelectedLayerPoint(point, layer);
+    localPoint.x = Math.max(0, Math.min(layer.canvas.width, localPoint.x));
+    localPoint.y = Math.max(0, Math.min(layer.canvas.height, localPoint.y));
+
+    previewErasing = true;
+    previewPaintMode = mode;
+    previewEraseLastPoint = localPoint;
+    previewPaintStartPoint = {x: localPoint.x, y: localPoint.y};
+    previewPaintMoved = false;
+    previewSelectionCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+}
+function continuePreviewPaint(event) {
+    if (!previewErasing) return;
+    var layer = previewLayers[previewSelectedLayerIndex];
+    if (!layer) return;
+
+    var point = getCanvasPoint(event, previewSelectionCanvas);
+    var localPoint = getSelectedLayerPoint(point, layer);
+    localPoint.x = Math.max(0, Math.min(layer.canvas.width, localPoint.x));
+    localPoint.y = Math.max(0, Math.min(layer.canvas.height, localPoint.y));
+
+    if ((previewPaintMode === "erase" || previewPaintMode === "add") && !previewPaintMoved) {
+        var dx = localPoint.x - previewPaintStartPoint.x;
+        var dy = localPoint.y - previewPaintStartPoint.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 4) {
+            event.preventDefault();
+            return;
+        }
+
+        previewPaintMoved = true;
+        if (previewPaintMode === "erase") {
+            applyPreviewPaintSegment(
+                layer,
+                previewPaintStartPoint,
+                previewPaintStartPoint,
+                "erase"
+            );
+        }
+    }
+
+    if (previewPaintMode === "erase" || previewPaintMode === "add") {
+        applyPreviewPaintSegment(
+            layer, previewEraseLastPoint, localPoint, previewPaintMode
+        );
+    }
+
+    previewEraseLastPoint = localPoint;
+    redrawPreviewOverlay();
+    event.preventDefault();
+}
+function stopPreviewErase(event) {
+    if (!previewErasing) return;
+
+    // 動かさずに離した場合は、タップした筆跡の連結領域をまとめて処理
+    if (!previewPaintMoved && previewPaintStartPoint) {
+        var layer = previewLayers[previewSelectedLayerIndex];
+        if (layer) {
+            if (previewPaintMode === "erase") {
+                eraseConnectedStroke(layer, previewPaintStartPoint);
+            } else if (previewPaintMode === "add") {
+                addConnectedStroke(layer, previewPaintStartPoint);
+            }
+        }
+    }
+
+    previewErasing = false;
+    previewEraseLastPoint = null;
+    previewPaintStartPoint = null;
+    previewPaintMoved = false;
+    previewPaintMode = null;
+    if (previewSelectionCanvas.hasPointerCapture(event.pointerId)) {
+        previewSelectionCanvas.releasePointerCapture(event.pointerId);
+    }
+    redrawPreviewOverlay();
+}
+// 範囲選択・部分消去用キャンバスのイベント
+previewSelectionCanvas.addEventListener("pointerdown", function (event) {
+    if (messageMode) return;
+
+    if (previewMode !== "select" && previewMode !== "erase" && previewMode !== "add") return;
+
+    event.preventDefault();
+
+    if (previewMode === "select") {
+        beginPreviewSelection(event);
+    } else if (previewMode === "erase") {
+        setStatus("消したい線をタッチ、またはなぞってください。");
+        beginPreviewPaint(event, "erase");
+    } else if (previewMode === "add") {
+        setStatus("追加したい線をタップ、またはなぞってください。");
+        beginPreviewPaint(event, "add");
+    }
 });
 
 previewSelectionCanvas.addEventListener("pointermove", function (event) {
     if (previewSelecting) {
+        event.preventDefault();
         continuePreviewSelection(event);
+    } else if (previewErasing) {
+        event.preventDefault();
+        continuePreviewPaint(event);
     }
 });
 
 previewSelectionCanvas.addEventListener("pointerup", function (event) {
     if (previewSelecting) {
         stopPreviewSelection(event);
+    } else if (previewErasing) {
+        stopPreviewErase(event);
     }
 });
 
 previewSelectionCanvas.addEventListener("pointercancel", function (event) {
     if (previewSelecting) {
         stopPreviewSelection(event);
+    } else if (previewErasing) {
+        stopPreviewErase(event);
     }
 });
-
-previewSelectionCanvas.addEventListener("pointerleave", function (event) {
-    if (previewSelecting) {
-        stopPreviewSelection(event);
-    }
-});
-
 
 // 範囲選択ボタン
 previewSelectButton.addEventListener("click", function () {
@@ -1187,7 +1690,12 @@ previewSelectButton.addEventListener("click", function () {
     messageCanvas.style.pointerEvents = "none";
 
     previewMode = "select";
+    previewLineTools.style.display = "flex";
+    previewErasing = false;
+    previewEraseLastPoint = null;
     previewSelectionCanvas.style.pointerEvents = "auto";
+    previewSelectionCanvas.style.zIndex = "20";
+    messageCanvas.style.pointerEvents = "none";
     setPreviewActiveButton(previewSelectButton);
 
     toggleMessageButton.textContent = "メッセージを書く";
@@ -1195,6 +1703,37 @@ previewSelectButton.addEventListener("click", function () {
     redrawPreviewOverlay();
 
     setStatus("範囲選択を開始しました。");
+});
+
+// 選択範囲内の線を消すモード
+function activatePreviewPaintMode(mode, activeButton) {
+    finishMessageMode();
+    if (previewSelectedLayerIndex < 0 || !previewLayers[previewSelectedLayerIndex]) {
+        setStatus("先に範囲選択をして、切り出してください。");
+        return;
+    }
+    previewSelecting = false;
+    previewErasing = false;
+    previewEraseLastPoint = null;
+    messageMode = false;
+    messageCanvas.style.pointerEvents = "none";
+    previewMode = mode;
+    previewSelectionCanvas.style.pointerEvents = "auto";
+    previewSelectionCanvas.style.zIndex = "20";
+    setPreviewActiveButton(activeButton);
+    if (mode === "erase") {
+        setStatus("消したい線をタッチ、またはなぞってください。元のカードには影響しません。");
+    } else {
+        setStatus("追加したい線をタッチ、またはなぞってください。元のカードにある線を選択範囲へ戻します。");
+    }
+}
+
+previewEraseButton.addEventListener("click", function () {
+    activatePreviewPaintMode("erase", previewEraseButton);
+});
+
+previewAddButton.addEventListener("click", function () {
+    activatePreviewPaintMode("add", previewAddButton);
 });
 
 
@@ -1250,10 +1789,10 @@ function renderHandwritingKeyboard() {
 
     var keyboardRows = [
         ["っ","ゃ","ぱ","ば","だ","ざ","が","わ","ら","や","ま","は","な","た","さ","か","あ"],
-        ["わ","","ぴ","び","ぢ","じ","ぎ","を","り","","み","ひ","に","ち","し","き","い"],
-        ["","ゆ","ぷ","ぶ","づ","ず","ぐ","ん","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
+        ["","","ぴ","び","ぢ","じ","ぎ","","り","","み","ひ","に","ち","し","き","い"],
+        ["","ゅ","ぷ","ぶ","づ","ず","ぐ","を","る","ゆ","む","ふ","ぬ","つ","す","く","う"],
         ["","","ぺ","べ","で","ぜ","げ","","れ","","め","へ","ね","て","せ","け","え"],
-        ["","よ","ぽ","ぼ","ど","ぞ","ご","","ろ","よ","も","ほ","の","と","そ","こ","お"]
+        ["","ょ","ぽ","ぼ","ど","ぞ","ご","ん","ろ","よ","も","ほ","の","と","そ","こ","お"]
     ];
 
     keyboardRows.forEach(function (row) {
@@ -1335,15 +1874,53 @@ confirmRegisterButton.addEventListener("click", function () {
         return;
     }
 
-    var copyCanvas = document.createElement("canvas");
+    // 登録時は透明部分を除いた筆跡の範囲だけを切り出す。
+    // 「線を追加」のためにレイヤーをプレビュー全体へ広げていても、
+    // キーボード上で文字が極端に小さく表示されないようにする。
+    var sourceCanvas = registerTargetLayer.canvas;
+    var sourceCtx = sourceCanvas.getContext("2d");
+    var sourceImage = sourceCtx.getImageData(
+        0, 0, sourceCanvas.width, sourceCanvas.height
+    );
+    var pixels = sourceImage.data;
 
-    copyCanvas.width = registerTargetLayer.canvas.width;
-    copyCanvas.height = registerTargetLayer.canvas.height;
+    var minX = sourceCanvas.width;
+    var minY = sourceCanvas.height;
+    var maxX = -1;
+    var maxY = -1;
+
+    for (var y = 0; y < sourceCanvas.height; y += 1) {
+        for (var x = 0; x < sourceCanvas.width; x += 1) {
+            var alpha = pixels[(y * sourceCanvas.width + x) * 4 + 3];
+            if (alpha > 10) {
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+
+    if (maxX < minX || maxY < minY) {
+        setStatus("登録できる線がありません。線を追加するか、範囲を選び直してください。");
+        return;
+    }
+
+    // 少しだけ余白を付けて切り出す
+    var margin = 3;
+    minX = Math.max(0, minX - margin);
+    minY = Math.max(0, minY - margin);
+    maxX = Math.min(sourceCanvas.width - 1, maxX + margin);
+    maxY = Math.min(sourceCanvas.height - 1, maxY + margin);
+
+    var copyCanvas = document.createElement("canvas");
+    copyCanvas.width = maxX - minX + 1;
+    copyCanvas.height = maxY - minY + 1;
 
     copyCanvas.getContext("2d").drawImage(
-        registerTargetLayer.canvas,
-        0,
-        0
+        sourceCanvas,
+        minX, minY, copyCanvas.width, copyCanvas.height,
+        0, 0, copyCanvas.width, copyCanvas.height
     );
 
     var kana = registerKana.value;
