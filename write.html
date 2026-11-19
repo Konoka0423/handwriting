@@ -481,19 +481,141 @@ button.active {
   font-family: "ヒラギノ丸ゴ Pro", serif !important;
 }
 
+
+
+/* ログイン・アカウントメニュー */
+body.auth-pending { visibility: hidden; }
+.site-header { position: sticky; }
+.site-header > header { position: relative; }
+.site-title-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink, #1d1d1f);
+    box-shadow: none;
+    transform: none;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
+}
+.site-title-button:hover,
+.site-title-button:active {
+    background: transparent;
+    color: var(--ink, #1d1d1f);
+    border: 0;
+    box-shadow: none;
+    transform: none;
+}
+.site-title-text {
+    display: inline-block;
+    margin: 0;
+    font-size: clamp(1.25rem, 2.3vw, 2rem);
+    letter-spacing: 0.04em;
+}
+.site-title-chevron {
+    font-size: 16px;
+    color: #666;
+    transition: transform .18s ease;
+}
+.site-title-button[aria-expanded="true"] .site-title-chevron {
+    transform: rotate(180deg);
+}
+.account-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: max(16px, calc((100vw - 1180px) / 2 + 16px));
+    z-index: 300;
+    width: min(280px, calc(100vw - 32px));
+    padding: 14px;
+    border: 1px solid #dedede;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 28px rgba(0,0,0,.13);
+}
+.account-menu[hidden] { display: none; }
+.account-menu-user {
+    padding: 4px 8px 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee;
+    color: #666;
+    font-size: 13px;
+}
+.account-menu button {
+    display: block;
+    width: 100%;
+    padding: 12px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    font-size: 14px;
+    box-shadow: none;
+    transform: none;
+}
+.account-menu button:hover { background: #f2f2f2; box-shadow: none; transform: none; }
+.account-menu button.logout { color: #a33; }
+@media (max-width: 760px) {
+    .account-menu { left: 12px; }
+    .site-title-text { font-size: clamp(1.05rem, 3.5vw, 1.5rem); }
+}
+
+
+/* グループ機能の案内 */
+.group-notice {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0,0,0,.42);
+}
+.group-notice.visible { display: flex; }
+.group-notice-box {
+    width: min(420px, 100%);
+    box-sizing: border-box;
+    padding: 24px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+}
+.group-notice-box h2 { margin: 0 0 12px; font-size: 1.25rem; }
+.group-notice-box p { line-height: 1.7; overflow-wrap: anywhere; }
+.group-notice-code {
+    padding: 12px;
+    border: 1px dashed #999;
+    border-radius: 8px;
+    background: #f7f7f7;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-align: center;
+    user-select: all;
+}
+.group-notice-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+.group-notice-actions button { min-width: 90px; }
+
 </style>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 
-<body>
+<body class="auth-pending">
 
 <div class="site-header">
     <header>
-        <h1>メッセージと文字を交換するサイト</h1>
+        <button type="button" id="siteTitleButton" class="site-title-button" aria-expanded="false" aria-controls="accountMenu">
+            <span class="site-title-text">メッセージと文字を交換するサイト</span>
+            <span class="site-title-chevron" aria-hidden="true">⌄</span>
+        </button>
     </header>
 
-    <!-- ナビゲーションバー -->
     <nav class="site-nav" aria-label="メインナビゲーション">
         <a href="write.html" class="active">
             <span class="nav-icon">✎</span>
@@ -505,6 +627,24 @@ button.active {
             <span>みんなのメッセージ</span>
         </a>
     </nav>
+
+<div id="accountMenu" class="account-menu" hidden>
+    <div class="account-menu-user" id="accountMenuUser">ログイン中</div>
+    <button type="button" id="createGroupMenuButton">＋ グループを作成</button>
+    <button type="button" id="joinGroupMenuButton">↗ グループに参加</button>
+    <button type="button" id="logoutMenuButton" class="logout">ログアウト</button>
+</div>
+</div>
+
+
+<div id="groupNotice" class="group-notice" role="dialog" aria-modal="true" aria-labelledby="groupNoticeTitle">
+  <div class="group-notice-box">
+    <h2 id="groupNoticeTitle">グループ</h2>
+    <div id="groupNoticeBody"></div>
+    <div class="group-notice-actions">
+      <button type="button" id="groupNoticeClose">閉じる</button>
+    </div>
+  </div>
 </div>
 
 <main>   
@@ -627,6 +767,11 @@ function loadSnapshotsFromStorage() {
                 dataUrl: item.dataUrl,
                 width: typeof item.width === "number" ? item.width : canvas.width,
                 height: typeof item.height === "number" ? item.height : canvas.height,
+                // 投稿者情報はカードと一緒に保持する
+                authorId: typeof item.authorId === "string" ? item.authorId : "",
+                authorNickname: typeof item.authorNickname === "string" ? item.authorNickname : "",
+                // keybord.htmlで追加されるメッセージ画像も消さずに引き継ぐ
+                messageDataUrl: typeof item.messageDataUrl === "string" ? item.messageDataUrl : "",
             };
         });
     } catch (error) {
@@ -1121,6 +1266,9 @@ function renderCurrentCanvasSnapshot() {
         dataUrl: snapshotCanvas.toDataURL("image/png"),
         width: snapshotCanvas.width,
         height: snapshotCanvas.height,
+        // 保存した時点の投稿者を記録する（ログイン中のユーザー）
+        authorId: window.currentUserId || "",
+        authorNickname: window.currentUserNickname || "投稿者不明",
     };
 }
 
@@ -1371,6 +1519,372 @@ ensureOverlayPointerEvents();
 redrawOverlay();
 loadSnapshotsFromStorage();
 
+</script>
+
+
+
+
+
+<!-- Supabaseログイン確認・アカウントメニュー -->
+<script>
+(function () {
+    const SUPABASE_URL = "https://anxztdqzqqptacyaxgum.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_4X9evS2Q6xOqQyqfi8brMg_e-XUD2Dr";
+
+    const supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+    );
+
+    // ==============================
+    // HTML要素の取得
+    // ==============================
+
+    const titleButton = document.getElementById("siteTitleButton");
+    const accountMenu = document.getElementById("accountMenu");
+    const accountMenuUser = document.getElementById("accountMenuUser");
+
+    const logoutButton = document.getElementById("logoutMenuButton");
+    const createGroupButton = document.getElementById("createGroupMenuButton");
+    const joinGroupButton = document.getElementById("joinGroupMenuButton");
+
+    const groupNotice = document.getElementById("groupNotice");
+    const groupNoticeTitle = document.getElementById("groupNoticeTitle");
+    const groupNoticeBody = document.getElementById("groupNoticeBody");
+    const groupNoticeClose = document.getElementById("groupNoticeClose");
+
+
+    // ==============================
+    // アカウントメニュー
+    // ==============================
+
+    function closeMenu() {
+        accountMenu.hidden = true;
+        titleButton.setAttribute("aria-expanded", "false");
+    }
+
+    titleButton.addEventListener("click", function () {
+        const willOpen = accountMenu.hidden;
+
+        accountMenu.hidden = !willOpen;
+        titleButton.setAttribute("aria-expanded", String(willOpen));
+    });
+
+    document.addEventListener("click", function (event) {
+        if (
+            !accountMenu.contains(event.target) &&
+            !titleButton.contains(event.target)
+        ) {
+            closeMenu();
+        }
+    });
+
+
+    // ==============================
+    // お知らせ・ダイアログ
+    // ==============================
+
+    function showGroupNotice(title, html) {
+        groupNoticeTitle.textContent = title;
+        groupNoticeBody.innerHTML = html;
+        groupNotice.classList.add("visible");
+    }
+
+    function closeGroupNotice() {
+        groupNotice.classList.remove("visible");
+    }
+
+    groupNoticeClose.addEventListener("click", closeGroupNotice);
+
+    groupNotice.addEventListener("click", function (event) {
+        if (event.target === groupNotice) {
+            closeGroupNotice();
+        }
+    });
+
+    function showFeatureNotice(message) {
+        showGroupNotice("お知らせ", "<p></p>");
+
+        groupNoticeBody.querySelector("p").textContent = message;
+
+        closeMenu();
+    }
+
+
+    // ==============================
+    // ログインユーザーの確認
+    // ==============================
+
+    async function getCurrentUser() {
+        const { data, error } = await supabaseClient.auth.getUser();
+
+        if (error) {
+            throw error;
+        }
+
+        if (!data.user) {
+            throw new Error("ログイン情報を取得できませんでした。");
+        }
+
+        return data.user;
+    }
+
+
+    // ==============================
+    // グループ作成
+    // ==============================
+
+    createGroupButton.addEventListener("click", async function () {
+
+        closeMenu();
+
+        const groupName = window.prompt(
+            "作成するグループ名を入力してください。"
+        );
+
+        if (groupName === null) {
+            return;
+        }
+
+        const name = groupName.trim();
+
+        if (!name) {
+            showFeatureNotice("グループ名を入力してください。");
+            return;
+        }
+
+        if (name.length > 40) {
+            showFeatureNotice(
+                "グループ名は40文字以内で入力してください。"
+            );
+            return;
+        }
+
+        createGroupButton.disabled = true;
+
+        try {
+
+            // ログインユーザーを確認
+            const user = await getCurrentUser();
+
+            console.log("グループ作成ユーザーID:", user.id);
+
+            // Supabaseのcreate_group関数を実行
+            const { data, error } = await supabaseClient
+                .rpc("create_group", {
+                    _name: name
+                });
+
+            if (error) {
+                throw error;
+            }
+
+            // 戻り値から作成されたグループを取得
+            const group = Array.isArray(data) ? data[0] : data;
+
+            if (!group) {
+                throw new Error(
+                    "グループ情報を取得できませんでした。"
+                );
+            }
+
+            console.log("グループ作成成功:", group);
+
+            // 作成完了のお知らせ
+            showGroupNotice(
+                "グループを作成しました！",
+                `
+                    <p>グループ名</p>
+                    <div class="group-notice-code" id="createdGroupName"></div>
+
+                    <p>招待コード（参加する人に共有してください）</p>
+                    <div class="group-notice-code" id="createdInviteCode"></div>
+                `
+            );
+
+            document.getElementById("createdGroupName").textContent =
+                group.group_name;
+
+            document.getElementById("createdInviteCode").textContent =
+                group.invite_code;
+
+        } catch (error) {
+
+            console.error("グループ作成エラー:", error);
+
+            showFeatureNotice(
+                "グループを作成できませんでした。\n" +
+                (error.message || "原因不明のエラーです。")
+            );
+
+        } finally {
+
+            createGroupButton.disabled = false;
+
+        }
+    });
+
+
+    
+// ==============================
+// 招待コードでグループ参加
+// ==============================
+
+
+joinGroupButton.addEventListener("click", async function () {
+    closeMenu();
+
+    const inputCode = window.prompt("招待コードを入力してください。");
+
+    if (inputCode === null) return;
+
+    const inviteCode = inputCode.trim().toUpperCase();
+
+    if (!inviteCode) {
+        showFeatureNotice("招待コードを入力してください。");
+        return;
+    }
+
+    joinGroupButton.disabled = true;
+
+    try {
+        // 招待コードを使ってSupabaseの関数を実行
+        const { data, error } = await supabaseClient
+            .rpc("join_group_by_invite_code", {
+                _invite_code: inviteCode
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        // 該当するグループがなかった場合
+        if (!data || data.length === 0) {
+            showFeatureNotice(
+                "招待コードに一致するグループが見つかりませんでした。コードを確認してください。"
+            );
+            return;
+        }
+
+        // 参加したグループ名
+        const group = data[0];
+
+        console.log("グループ参加成功:", group);
+
+        // 参加完了のお知らせ
+        showGroupNotice(
+            "グループに参加しました！",
+            `
+                <p>参加したグループ</p>
+                <div class="group-notice-code"></div>
+            `
+        );
+
+        groupNoticeBody.querySelector(
+            ".group-notice-code"
+        ).textContent = group.group_name;
+
+    } catch (error) {
+        console.error("グループ参加エラー:", error);
+
+        showFeatureNotice(
+            "グループに参加できませんでした。\n" +
+            (error.message || "原因不明のエラーです。")
+        );
+
+    } finally {
+        joinGroupButton.disabled = false;
+    }
+});
+
+
+
+
+    // ==============================
+    // ログアウト
+    // ==============================
+
+    logoutButton.addEventListener("click", async function () {
+
+        logoutButton.disabled = true;
+        logoutButton.textContent = "ログアウト中...";
+
+        try {
+
+            const { error } = await supabaseClient.auth.signOut();
+
+            if (error) {
+                throw error;
+            }
+
+            location.replace("index.html");
+
+        } catch (error) {
+
+            console.error("ログアウトエラー:", error);
+
+            logoutButton.disabled = false;
+            logoutButton.textContent = "ログアウト";
+
+            showFeatureNotice(
+                "ログアウトできませんでした。もう一度お試しください。"
+            );
+
+        }
+    });
+
+
+    // ==============================
+    // 初期ログイン確認
+    // ==============================
+
+    async function initializeAuth() {
+
+        try {
+
+            const { data, error } =
+                await supabaseClient.auth.getSession();
+
+            if (error) {
+                throw error;
+            }
+
+            if (!data.session) {
+                location.replace("index.html");
+                return;
+            }
+
+            const user = data.session.user;
+
+            const nickname =
+                user.user_metadata?.nickname || "ユーザー";
+
+            // 他のJavaScriptからも利用できるように保存
+            window.currentUserId = user.id;
+            window.currentUserNickname = nickname;
+
+            accountMenuUser.textContent =
+                nickname + " さんでログイン中";
+
+            console.log("ログインユーザーID:", user.id);
+
+            document.body.classList.remove("auth-pending");
+
+        } catch (error) {
+
+            console.error(
+                "ログイン状態の確認に失敗しました:",
+                error
+            );
+
+            location.replace("index.html");
+
+        }
+    }
+
+    initializeAuth();
+
+})();
 </script>
 
 
