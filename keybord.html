@@ -660,9 +660,63 @@ body.auth-pending { visibility: hidden; }
 .group-notice-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
 .group-notice-actions button { min-width: 90px; }
 
+/* アカウントメニュー内のグループ一覧 */
+.account-group-section {
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.account-group-label {
+    padding: 4px 8px 8px;
+    font-size: 12px;
+    color: #888;
+}
+
+.account-group-empty {
+    padding: 10px 8px;
+    font-size: 13px;
+    color: #999;
+}
+
+#accountGroupList {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* 選択されていないグループ */
+.account-menu .account-group-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #888;
+    font-weight: normal;
+    background: transparent;
+}
+
+/* 現在選択中のグループ */
+.account-menu .account-group-button.active {
+    color: #222;
+    font-weight: bold;
+    background: #eeeeee;
+}
+
+/* 選択中のチェックマーク */
+.account-group-check {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
 </style>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 </head>
+
 
 <body class="auth-pending">
 <div class="site-header">
@@ -686,6 +740,12 @@ body.auth-pending { visibility: hidden; }
 
 <div id="accountMenu" class="account-menu" hidden>
     <div class="account-menu-user" id="accountMenuUser">ログイン中</div>
+    <div class="account-group-section">
+        <div class="account-group-label">参加中のグループ</div>
+        <div id="accountGroupList">
+            <div class="account-group-empty">読み込み中...</div>
+        </div>
+    </div>
     <button type="button" id="createGroupMenuButton">＋ グループを作成</button>
     <button type="button" id="joinGroupMenuButton">↗ グループに参加</button>
     <button type="button" id="logoutMenuButton" class="logout">ログアウト</button>
@@ -723,7 +783,7 @@ body.auth-pending { visibility: hidden; }
                 </div>
                 <button type="button" id="registerKeyboard">キーボードに登録</button>
                 <button type="button" id="toggleKeyboard">キーボードを表示</button>
-                <button type="button" id="toggleMessage">メッセージを書く</button>
+                <button type="button" id="toggleMessage" disabled>メッセージを書く</button>
             </div>
 
             <!-- キャンバス部分 -->
@@ -773,7 +833,7 @@ body.auth-pending { visibility: hidden; }
     <section class="gallery">
     <div class="gallery-header">
         <h2>保存したカード</h2>
-        <button type="button" id="resetAllButton" class="destructive">
+        <button type="button" id="resetAllButton" class="destructive" hidden>
             すべてリセット
         </button>
     </div>
@@ -908,35 +968,124 @@ function normalizeRect(start, end) {
 // 保存カードの読み込み・表示
 // ------------------------------
 
-function loadSnapshotsFromStorage() {
-    try {
-        var raw = localStorage.getItem(SAVED_CARD_STORAGE_KEY);
-        var parsed = raw ? JSON.parse(raw) : [];
+// カード読み込み処理の管理
+let cardLoadVersion = 0;
 
-        if (!Array.isArray(parsed)) {
-            snapshots = [];
+// Supabaseから選択中のグループのカードを取得
+async function loadSnapshotsFromSupabase() {
+
+    const loadVersion = ++cardLoadVersion;
+    const groupId = window.currentGroupId;
+
+    // 前のグループのカード・プレビューを消す
+    resetPreview();
+    snapshots = [];
+    renderSnapshotList();
+
+    if (!groupId) {
+        snapshotEmpty.textContent =
+            "グループを作成するか、グループに参加してください。";
+        return;
+    }
+
+    snapshotEmpty.textContent = "カードを読み込み中...";
+
+    try {
+
+        // 選択中のグループのカード情報を取得
+        const { data, error } =
+            await window.supabaseClient
+                .from("cards")
+                .select("*")
+                .eq("group_id", groupId)
+                .order("created_at", {
+                    ascending: false
+                });
+
+        if (error) {
+            throw error;
+        }
+
+        // Storageから画像を取得
+        const loadedSnapshots = await Promise.all(
+            (data || []).map(async function (card) {
+
+                const { data: imageBlob, error: imageError } =
+                    await window.supabaseClient.storage
+                        .from("card")
+                        .download(card.image_path);
+
+                if (imageError) {
+                    throw imageError;
+                }
+
+                // 画像を既存のキャンバスで扱える形式に変換
+                const dataUrl = await new Promise(
+                    function (resolve, reject) {
+
+                        const reader = new FileReader();
+
+                        reader.onload = function () {
+                            resolve(reader.result);
+                        };
+
+                        reader.onerror = reject;
+
+                        reader.readAsDataURL(imageBlob);
+                    }
+                );
+
+                return {
+                    id: card.id,
+                    groupId: card.group_id,
+                    dataUrl: dataUrl,
+                    imagePath: card.image_path,
+                    width: card.width,
+                    height: card.height,
+                    authorId: card.author_id,
+                    authorNickname: card.author_nickname,
+                    messageDataUrl: "",
+                    messageImagePath: card.message_image_path
+                };
+            })
+        );
+
+        // 読み込み中にグループが切り替わった場合は反映しない
+        if (
+            loadVersion !== cardLoadVersion ||
+            groupId !== window.currentGroupId
+        ) {
             return;
         }
 
-        snapshots = parsed.filter(function (item) {
-            return item && typeof item.dataUrl === "string";
-        }).map(function (item) {
-            return {
-                dataUrl: item.dataUrl,
-                width: typeof item.width === "number" ? item.width : 900,
-                height: typeof item.height === "number" ? item.height : 540,
-                messageDataUrl:
-                    typeof item.messageDataUrl === "string"
-                        ? item.messageDataUrl
-                        : "",
-                // カードを保存した時点の投稿者情報
-                authorId: typeof item.authorId === "string" ? item.authorId : "",
-                authorNickname: typeof item.authorNickname === "string" ? item.authorNickname : ""
-            };
-        });
+        snapshots = loadedSnapshots;
+
+        snapshotEmpty.textContent =
+            "このグループにはまだカードがありません。";
+
+        renderSnapshotList();
+
+        setStatus(
+            "「" + window.currentGroupName +
+            "」のカードを表示しています。"
+        );
 
     } catch (error) {
+
+        if (loadVersion !== cardLoadVersion) {
+            return;
+        }
+
+        console.error("カード読み込みエラー:", error);
+
         snapshots = [];
+
+        snapshotEmpty.textContent =
+            "カードを読み込めませんでした。";
+
+        renderSnapshotList();
+
+        setStatus("カードの読み込みに失敗しました。");
     }
 }
 
@@ -2347,7 +2496,6 @@ resetAllButton.addEventListener("click", function () {
 // 初期化
 // ------------------------------
 
-loadSnapshotsFromStorage();
 renderSnapshotList();
 resetPreview();
 renderHandwritingKeyboard();
@@ -2366,6 +2514,7 @@ renderHandwritingKeyboard();
         SUPABASE_URL,
         SUPABASE_KEY
     );
+    window.supabaseClient = supabaseClient;
 
     // ==============================
     // HTML要素の取得
@@ -2520,7 +2669,7 @@ renderHandwritingKeyboard();
             }
 
             console.log("グループ作成成功:", group);
-
+            await loadMyGroups();
             // 作成完了のお知らせ
             showGroupNotice(
                 "グループを作成しました！",
@@ -2605,7 +2754,7 @@ renderHandwritingKeyboard();
             const group = data[0];
 
             console.log("グループ参加成功:", group);
-
+            await loadMyGroups();
             // 参加完了のお知らせ
             showGroupNotice(
                 "グループに参加しました！",
@@ -2674,6 +2823,180 @@ renderHandwritingKeyboard();
     // 初期ログイン確認
     // ==============================
 
+    // ==============================
+    // グループ一覧・切り替え
+    // ==============================
+
+    const accountGroupList =
+        document.getElementById("accountGroupList");
+
+    let myGroups = [];
+
+    window.currentGroupId = null;
+    window.currentGroupName = "";
+
+    // ユーザーごとに選択中のグループを記憶
+    function getGroupStorageKey() {
+        return "selectedGroupId_" + window.currentUserId;
+    }
+
+    // グループを切り替える
+    function selectGroup(groupId) {
+
+        const group = myGroups.find(
+            item => item.id === groupId
+        );
+
+        if (!group) {
+            return;
+        }
+
+        window.currentGroupId = group.id;
+        window.currentGroupName = group.name;
+
+        localStorage.setItem(
+            getGroupStorageKey(),
+            group.id
+        );
+
+        renderGroupList();
+        loadSnapshotsFromSupabase();
+
+        console.log(
+            "選択中のグループ:",
+            window.currentGroupName,
+            window.currentGroupId
+        );
+    }
+
+    // グループ一覧を表示する
+    function renderGroupList() {
+
+        accountGroupList.replaceChildren();
+
+        if (myGroups.length === 0) {
+
+            const empty = document.createElement("div");
+
+            empty.className = "account-group-empty";
+            empty.textContent = "参加中のグループがありません";
+
+            accountGroupList.appendChild(empty);
+
+            return;
+        }
+
+        myGroups.forEach(group => {
+
+            const button = document.createElement("button");
+
+            button.type = "button";
+            button.className = "account-group-button";
+
+            const name = document.createElement("span");
+
+            name.textContent = group.name;
+
+            button.appendChild(name);
+
+            const isActive =
+                group.id === window.currentGroupId;
+
+            button.setAttribute(
+                "aria-pressed",
+                String(isActive)
+            );
+
+            // 選択中のグループ
+            if (isActive) {
+
+                button.classList.add("active");
+
+                const check = document.createElement("span");
+
+                check.className = "account-group-check";
+                check.textContent = "✓";
+
+                button.appendChild(check);
+            }
+
+            // グループ名を押したとき
+            button.addEventListener("click", function () {
+
+                selectGroup(group.id);
+
+            });
+
+            accountGroupList.appendChild(button);
+
+        });
+    }
+
+    // Supabaseから参加中のグループを取得
+    async function loadMyGroups() {
+
+        try {
+
+            const { data, error } = await supabaseClient
+                .from("groups")
+                .select("id, name")
+                .order("name");
+
+            if (error) {
+                throw error;
+            }
+
+            myGroups = data || [];
+
+            const savedGroupId = localStorage.getItem(
+                getGroupStorageKey()
+            );
+
+            const savedGroup = myGroups.find(
+                group => group.id === savedGroupId
+            );
+
+            if (savedGroup) {
+
+                selectGroup(savedGroup.id);
+
+            } else if (myGroups.length > 0) {
+
+                selectGroup(myGroups[0].id);
+
+            } else {
+
+                window.currentGroupId = null;
+                window.currentGroupName = "";
+                loadSnapshotsFromSupabase();
+
+
+                localStorage.removeItem(
+                    getGroupStorageKey()
+                );
+
+                renderGroupList();
+                loadSnapshotsFromSupabase();
+            }
+
+        } catch (error) {
+
+            console.error("グループ取得エラー:", error);
+
+            myGroups = [];
+
+            window.currentGroupId = null;
+            window.currentGroupName = "";
+
+            const empty = document.createElement("div");
+
+            empty.className = "account-group-empty";
+            empty.textContent = "グループを取得できませんでした";
+
+            accountGroupList.replaceChildren(empty);
+
+        }
+    }
     async function initializeAuth() {
 
         try {
@@ -2706,7 +3029,7 @@ renderHandwritingKeyboard();
             renderSnapshotList();
 
             console.log("ログインユーザーID:", user.id);
-
+            await loadMyGroups();
             document.body.classList.remove("auth-pending");
 
         } catch (error) {

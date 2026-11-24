@@ -600,6 +600,57 @@ body.auth-pending { visibility: hidden; }
 .group-notice-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
 .group-notice-actions button { min-width: 90px; }
 
+/* アカウントメニュー内のグループ一覧 */
+.account-group-section {
+    padding-bottom: 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.account-group-label {
+    padding: 4px 8px 8px;
+    font-size: 12px;
+    color: #888;
+}
+
+.account-group-empty {
+    padding: 10px 8px;
+    font-size: 13px;
+    color: #999;
+}
+
+#accountGroupList {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* 選択されていないグループ */
+.account-menu .account-group-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: #888;
+    font-weight: normal;
+    background: transparent;
+}
+
+/* 現在選択中のグループ */
+.account-menu .account-group-button.active {
+    color: #222;
+    font-weight: bold;
+    background: #eeeeee;
+}
+
+/* 選択中のチェックマーク */
+.account-group-check {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
 </style>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -630,6 +681,12 @@ body.auth-pending { visibility: hidden; }
 
 <div id="accountMenu" class="account-menu" hidden>
     <div class="account-menu-user" id="accountMenuUser">ログイン中</div>
+    <div class="account-group-section">
+        <div class="account-group-label">参加中のグループ</div>
+        <div id="accountGroupList">
+            <div class="account-group-empty">読み込み中...</div>
+        </div>
+    </div>
     <button type="button" id="createGroupMenuButton">＋ グループを作成</button>
     <button type="button" id="joinGroupMenuButton">↗ グループに参加</button>
     <button type="button" id="logoutMenuButton" class="logout">ログアウト</button>
@@ -704,9 +761,6 @@ var selectionStart = null;
 var layers = [];
 var selectedLayerIndex = -1;
 var activeTransform = null;
-var snapshots = [];
-var SAVED_CARD_STORAGE_KEY = "sharedSavedCards_v1";
-
 ctx.lineCap = "round";
 ctx.lineJoin = "round";
 ctx.strokeStyle = "#000000";
@@ -744,47 +798,6 @@ function normalizeRect(start, end) {
 
 function clearOverlay() {
     selectionCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
-}
-
-function loadSnapshotsFromStorage() {
-    try {
-        var raw = localStorage.getItem(SAVED_CARD_STORAGE_KEY);
-        if (!raw) {
-            snapshots = [];
-            return;
-        }
-
-        var parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            snapshots = [];
-            return;
-        }
-
-        snapshots = parsed.filter(function (item) {
-            return item && typeof item.dataUrl === "string";
-        }).map(function (item) {
-            return {
-                dataUrl: item.dataUrl,
-                width: typeof item.width === "number" ? item.width : canvas.width,
-                height: typeof item.height === "number" ? item.height : canvas.height,
-                // 投稿者情報はカードと一緒に保持する
-                authorId: typeof item.authorId === "string" ? item.authorId : "",
-                authorNickname: typeof item.authorNickname === "string" ? item.authorNickname : "",
-                // keybord.htmlで追加されるメッセージ画像も消さずに引き継ぐ
-                messageDataUrl: typeof item.messageDataUrl === "string" ? item.messageDataUrl : "",
-            };
-        });
-    } catch (error) {
-        snapshots = [];
-    }
-}
-
-function saveSnapshotsToStorage() {
-    try {
-        localStorage.setItem(SAVED_CARD_STORAGE_KEY, JSON.stringify(snapshots));
-    } catch (error) {
-        setStatus("保存カードの保存に失敗しました。ストレージ容量を確認してください。");
-    }
 }
 
 function ensureOverlayPointerEvents() {
@@ -1325,13 +1338,125 @@ eraserButton.addEventListener("click", function () {
     setTool("eraser");
 });
 
-applyButton.addEventListener("click", function () {
-    flattenLayersIntoCanvas();
-    var snapshot = renderCurrentCanvasSnapshot();
-    snapshots.unshift(snapshot);
-    saveSnapshotsToStorage();
-    resetWorkingCanvas();
-    setStatus("現在のキャンバスを保存して、新しいキャンバスを開始しました。");
+applyButton.addEventListener("click", async function () {
+
+    // 二重保存を防止
+    if (applyButton.disabled) {
+        return;
+    }
+
+    // ログイン状態の確認
+    const userId = window.currentUserId;
+
+    if (!userId) {
+        alert("ログインしてください。");
+        return;
+    }
+
+    // 選択中のグループを取得
+    const groupId = window.currentGroupId;
+    const groupName = window.currentGroupName;
+
+    if (!groupId) {
+        alert("グループを作成するか、グループに参加してください。");
+        return;
+    }
+
+    // 保存中は操作を無効にする
+    const main = document.querySelector("main");
+    const siteHeader = document.querySelector(".site-header");
+
+    applyButton.disabled = true;
+    applyButton.textContent = "保存中...";
+    main.inert = true;
+    siteHeader.inert = true;
+
+    setStatus("カードを保存しています...");
+
+    try {
+
+        // 現在のキャンバスからカード画像を生成
+        const snapshot = renderCurrentCanvasSnapshot();
+
+        // 画像をPNGファイルに変換
+        const response = await fetch(snapshot.dataUrl);
+        const imageBlob = await response.blob();
+
+        // カード固有のIDを生成
+        const cardId = crypto.randomUUID();
+
+        // Storage内の保存先
+        const imagePath =
+            `${groupId}/${userId}/${cardId}.png`;
+
+        // ==============================
+        // Storageに画像を保存
+        // ==============================
+
+        const { error: uploadError } =
+            await window.supabaseClient.storage
+                .from("card")
+                .upload(imagePath, imageBlob, {
+                    contentType: "image/png",
+                    upsert: false
+                });
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        // ==============================
+        // cardsテーブルにカード情報を登録
+        // ==============================
+
+        const { error: insertError } =
+            await window.supabaseClient
+                .from("cards")
+                .insert({
+                    id: cardId,
+                    group_id: groupId,
+                    author_id: userId,
+                    author_nickname: snapshot.authorNickname,
+                    image_path: imagePath,
+                    message_image_path: null,
+                    width: snapshot.width,
+                    height: snapshot.height
+                });
+
+        if (insertError) {
+            console.error("登録できなかった画像:", imagePath);
+            throw insertError;
+        }
+
+        // 保存に成功した場合のみリセット
+        resetWorkingCanvas();
+
+        setStatus(
+            "「" + groupName + "」にカードを保存しました。"
+        );
+
+    } catch (error) {
+
+        console.error("カード保存エラー:", error);
+
+        setStatus(
+            "カードの保存に失敗しました。もう一度お試しください。"
+        );
+
+        alert(
+            "カードを保存できませんでした。\n" +
+            error.message
+        );
+
+    } finally {
+
+        // 操作を再び有効にする
+        main.inert = false;
+        siteHeader.inert = false;
+        applyButton.disabled = false;
+        applyButton.textContent = "カードを保存";
+
+    }
 });
 
 clearButton.addEventListener("click", function () {
@@ -1517,7 +1642,6 @@ renderHandwritingKeyboard();
 setTool("pen");
 ensureOverlayPointerEvents();
 redrawOverlay();
-loadSnapshotsFromStorage();
 
 </script>
 
@@ -1535,6 +1659,7 @@ loadSnapshotsFromStorage();
         SUPABASE_URL,
         SUPABASE_KEY
     );
+    window.supabaseClient = supabaseClient;
 
     // ==============================
     // HTML要素の取得
@@ -1691,7 +1816,9 @@ loadSnapshotsFromStorage();
             console.log("グループ作成成功:", group);
 
             // 作成完了のお知らせ
+            await loadMyGroups();
             showGroupNotice(
+                
                 "グループを作成しました！",
                 `
                     <p>グループ名</p>
@@ -1770,7 +1897,7 @@ joinGroupButton.addEventListener("click", async function () {
         const group = data[0];
 
         console.log("グループ参加成功:", group);
-
+        await loadMyGroups();
         // 参加完了のお知らせ
         showGroupNotice(
             "グループに参加しました！",
@@ -1838,6 +1965,178 @@ joinGroupButton.addEventListener("click", async function () {
     // 初期ログイン確認
     // ==============================
 
+    // ==============================
+    // グループ一覧・切り替え
+    // ==============================
+
+    const accountGroupList =
+        document.getElementById("accountGroupList");
+
+    let myGroups = [];
+
+    window.currentGroupId = null;
+    window.currentGroupName = "";
+
+    // ユーザーごとに選択中のグループを記憶
+    function getGroupStorageKey() {
+        return "selectedGroupId_" + window.currentUserId;
+    }
+
+    // グループを切り替える
+    function selectGroup(groupId) {
+
+        const group = myGroups.find(
+            item => item.id === groupId
+        );
+
+        if (!group) {
+            return;
+        }
+
+        window.currentGroupId = group.id;
+        window.currentGroupName = group.name;
+
+        localStorage.setItem(
+            getGroupStorageKey(),
+            group.id
+        );
+
+        renderGroupList();
+
+        console.log(
+            "選択中のグループ:",
+            window.currentGroupName,
+            window.currentGroupId
+        );
+    }
+
+    // グループ一覧を表示する
+    function renderGroupList() {
+
+        accountGroupList.replaceChildren();
+
+        if (myGroups.length === 0) {
+
+            const empty = document.createElement("div");
+
+            empty.className = "account-group-empty";
+            empty.textContent = "参加中のグループがありません";
+
+            accountGroupList.appendChild(empty);
+
+            return;
+        }
+
+        myGroups.forEach(group => {
+
+            const button = document.createElement("button");
+
+            button.type = "button";
+            button.className = "account-group-button";
+
+            const name = document.createElement("span");
+
+            name.textContent = group.name;
+
+            button.appendChild(name);
+
+            const isActive =
+                group.id === window.currentGroupId;
+
+            button.setAttribute(
+                "aria-pressed",
+                String(isActive)
+            );
+
+            // 選択中のグループ
+            if (isActive) {
+
+                button.classList.add("active");
+
+                const check = document.createElement("span");
+
+                check.className = "account-group-check";
+                check.textContent = "✓";
+
+                button.appendChild(check);
+            }
+
+            // グループ名を押したとき
+            button.addEventListener("click", function () {
+
+                selectGroup(group.id);
+
+            });
+
+            accountGroupList.appendChild(button);
+
+        });
+    }
+
+    // Supabaseから参加中のグループを取得
+    async function loadMyGroups() {
+
+        try {
+
+            const { data, error } = await supabaseClient
+                .from("groups")
+                .select("id, name")
+                .order("name");
+
+            if (error) {
+                throw error;
+            }
+
+            myGroups = data || [];
+
+            const savedGroupId = localStorage.getItem(
+                getGroupStorageKey()
+            );
+
+            const savedGroup = myGroups.find(
+                group => group.id === savedGroupId
+            );
+
+            if (savedGroup) {
+
+                selectGroup(savedGroup.id);
+
+            } else if (myGroups.length > 0) {
+
+                selectGroup(myGroups[0].id);
+
+            } else {
+
+                window.currentGroupId = null;
+                window.currentGroupName = "";
+
+                localStorage.removeItem(
+                    getGroupStorageKey()
+                );
+
+                renderGroupList();
+
+            }
+
+        } catch (error) {
+
+            console.error("グループ取得エラー:", error);
+
+            myGroups = [];
+
+            window.currentGroupId = null;
+            window.currentGroupName = "";
+
+            const empty = document.createElement("div");
+
+            empty.className = "account-group-empty";
+            empty.textContent = "グループを取得できませんでした";
+
+            accountGroupList.replaceChildren(empty);
+
+        }
+    }
+
     async function initializeAuth() {
 
         try {
@@ -1867,7 +2166,7 @@ joinGroupButton.addEventListener("click", async function () {
                 nickname + " さんでログイン中";
 
             console.log("ログインユーザーID:", user.id);
-
+            await loadMyGroups();
             document.body.classList.remove("auth-pending");
 
         } catch (error) {
